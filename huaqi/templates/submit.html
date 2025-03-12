@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>国家选择器</title>
+    <!-- 引入 Vue.js -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        table {
+            border-collapse: collapse; /* 去掉单元格之间的间距 */
+            width: 100%; /* 让表格占满整个宽度 */
+        }
+
+        td {
+            border: none; /* 去掉单元格边框 */
+            padding: 5px; /* 给单元格内容添加一些内边距 */
+            text-align: left; /* 设置文本对齐方式 */
+        }
+    </style>
+</head>
+<body>
+<div class="container" id="submit">
+    <div class="info">
+        <h3>选择日期：</h3>
+        <input type="date" v-model="selectedDate">
+        <h3>已选择国家：</h3>
+        <ul>
+            <input type="text" v-model="text1" placeholder="国家1" />
+            <input type="text" v-model="text2" placeholder="国家2" />
+
+        </ul>
+        <button @click="sendToBackend" :disabled="(!text1 && !text2)|| !selectedDate">
+            发送到后端
+        </button>
+    </div>
+     <table>
+        <tr>
+            <td>{{ currency }}</td>
+            <td>{{ sign }}</td>
+            <td>{{ currency1_name }}</td>
+            <td>{{ currency_rate1 }}</td>
+            <td>{{ currency2_name }}</td>
+            <td>{{ currency_rate2 }}</td>
+            <td>{{ currency3_name }}</td>
+            <td>{{ currency_rate3 }}</td>
+            <td>{{ currency4_name }}</td>
+            <td>{{ currency_rate4 }}</td>
+            <td>{{ currency5_name }}</td>
+            <td>{{ currency_rate5 }}</td>
+            <td>{{ currency6_name }}</td>
+            <td>{{ currency_rate6 }}</td>
+            <td>{{ currency7_name }}</td>
+            <td>{{ currency_rate7 }}</td>
+            <td>{{ currency8_name }}</td>
+            <td>{{ currency_rate8 }}</td>
+        </tr>
+    </table>
+</div>
+
+<script>
+// 创建 Vue 应用
+const { ref, watch } = Vue;
+
+const app = Vue.createApp({
+    setup() {
+        const text1 = ref('');
+        const text2 = ref('');
+        const selectedCountries = ref([]);
+        const selectedDate = ref('')
+
+        // 监听 text1 和 text2 的变化，更新 selectedCountries
+        watch([text1, text2], () => {
+            selectedCountries.value = [text1.value, text2.value].filter(item => item.trim() !== '');
+
+        });
+
+        const sendToBackend = async () => {
+            try {
+                // 确保两个输入框都有值
+                if ((!text1.value && !text2.value)|| !selectedDate.value) {
+                    alert('请至少填写一个国家并选择日期！');
+                    return;
+                }
+
+                const response = await fetch("http://127.0.0.1:8000/submit/", {  // Django 后端的地址
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ countries: selectedCountries.value,date_select: selectedDate.value })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP 错误！状态码：${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log("✅ 数据发送成功:", result);
+                alert('数据发送成功！');
+            } catch (error) {
+                console.error("❌ 发送数据失败:", error);
+                alert('发送数据失败，请检查后端服务是否正常运行！');
+            }
+        };
+
+        return {
+            text1,
+            text2,
+            selectedCountries,
+            selectedDate,
+            sendToBackend
+        };
+    }
+});
+
+// 挂载 Vue 应用
+app.mount('#submit');
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>注册</title>
+</head>
+<body>
+<h1>用户注册表单</h1>
+    <form action="/register/" method="POST">
+        <label for="username">账号：</label>
+        <input type="text" id="username" name="username" required><br><br>
+        <label for="username">邮箱：</label>
+        <input type="email" id="email" name="email" required><br><br>
+        <label for="password">密码：</label>
+        <input type="password" id="password" name="password" required><br><br>
+
+        <label for="confirm-password">确认密码：</label>
+        <input type="password" id="confirm-password" name="confirm-password" required><br><br>
+        <label for="account_name">用户名：</label>
+        <input type="text" id="account_name" name="account_name" required><br><br>
+        <label for="user_type">请选择您的身份：</label>
+        <select id="user_type" name="user_type">
+            <option value="企业">企业</option>
+            <option value="个人">个人</option>
+            <option value="银行">银行</option>
+        </select>
+
+        <input type="submit" value="提交">
+        <a>{{ error }}</a>
+    </form>
+</body>
+</html>

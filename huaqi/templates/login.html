@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>登录</title>
+</head>
+<body>
+<h1>用户登录表单</h1>
+    <form action="/login/" method="POST">
+        <label for="username">账号：</label>
+        <input type="text" id="username" name="username" required><br><br>
+
+        <label for="password">密码：</label>
+        <input type="password" id="password" name="password" required><br><br>
+
+
+        <input type="submit" value="提交">
+        <a href='/register/'>没有账户？点击注册</a>
+        <a>{{ error }}</a>
+    </form>
+</body>
+</html>
