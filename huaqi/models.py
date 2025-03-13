@@ -33,3 +33,13 @@ class earth_rate(models.Model):
     currency_rate8 = models.DecimalField(max_digits=10, decimal_places=6)
     currency9_name = models.CharField(max_length=100, null=True, blank=True)
     currency_rate9 = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+
+class country_currency(models.Model):
+    country = models.CharField(max_length=100)
+    currency = models.CharField(max_length=100)
+
+class date_currency_rate(models.Model):
+    date = models.CharField(max_length=100)
+    currency_1 = models.CharField(max_length=100)
+    currency_2 = models.CharField(max_length=100)
+    rate = models.DecimalField(max_digits=10, decimal_places=6)

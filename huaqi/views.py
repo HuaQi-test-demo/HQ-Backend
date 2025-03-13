@@ -19,9 +19,9 @@ def login(request):
         print(username,password)
         access_token=secrets.token_hex(32)
         obj_user=models.userInfo.objects.filter(name=username,password=password).first()
-
+        # obj_user = ["k"]
         if obj_user is not None :
-          print(obj_user.account_name)
+        #   print(obj_user.account_name)
          #request.session['account_name'] = obj.account_name
             #print(obj.account_name)
             # redirect('/submit/')
@@ -56,24 +56,41 @@ def login(request):
                  }
              }
          })
-
+        
 def register(request):
-    if request.method == "GET":
-        return render(request, 'register.html')
-    else:
-        new_username = request.POST['username']
-        new_password = request.POST['password']
-        new_confirmpassword = request.POST['confirm-password']
-        new_user_type = request.POST['user_type']
-        new_email = request.POST['email']
-        new_account_name = request.POST['account_name']
-        if new_password != new_confirmpassword:
-            return render(request,'register.html',{"error":"两次密码不一致，请重新设置密码"})
-        elif models.userInfo.objects.filter(name=new_username).exists():
-            return render(request,'register.html',{"error":"账号已存在，请换一个"})
+    if request.method == "POST":
+        data = json.loads(request.body)
+        username = data.get('username')
+        password =data.get('password')
+        confirm_password =data.get('confirm_password')
+        user_type =data.get('user_type')
+        email =data.get('email')
+        account_name =data.get('account_name')
+        if password != confirm_password:
+            return JsonResponse({'status': 'error', 'message': '两次密码不一致，请重新设置密码'})
+        elif models.userInfo.objects.filter(name=username).exists():
+            return JsonResponse({'status': 'error', 'message': '账号已存在，请换一个'})
         else:
-         models.userInfo.objects.create(name=new_username,password=new_password,user_type=new_user_type,email=new_email,account_name=new_account_name)
-         return redirect('/login/')
+         models.userInfo.objects.create(name=username,password=password,user_type=user_type,email=email,account_name=account_name)
+         return JsonResponse({'status': 'ok', 'message': '注册成功'})
+        
+    # if request.method == "GET":
+    #     return render(request, 'register.html')
+    # else:
+    #     new_username = request.POST['username']
+    #     new_password = request.POST['password']
+    #     new_confirmpassword = request.POST['confirm-password']
+    #     new_user_type = request.POST['user_type']
+    #     new_email = request.POST['email']
+    #     new_account_name = request.POST['account_name']
+    #     if new_password != new_confirmpassword:
+    #         return render(request,'register.html',{"error":"两次密码不一致，请重新设置密码"})
+    #     elif models.userInfo.objects.filter(name=new_username).exists():
+    #         return render(request,'register.html',{"error":"账号已存在，请换一个"})
+    #     else:
+    #      models.userInfo.objects.create(name=new_username,password=new_password,user_type=new_user_type,email=new_email,account_name=new_account_name)
+    #      return redirect('/login/')
+
 def table(request):
     table_account_name=request.session['account_name']
     if table_account_name is not None :
@@ -81,6 +98,7 @@ def table(request):
       return render(request,'table.html',{'table_account_name':table_account_name})
     else:
         return render(request,'login.html')
+
 def submit_view(request):
     #if request.method == "GET":
         #return render(request, 'submit.html')
@@ -157,3 +175,29 @@ def submit_view(request):
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
+def select_twe_countries(request):
+    if request.method == 'POST':
+        try:
+            # 获取前端发送的 JSON 数据
+            data = json.loads(request.body)
+            country_1 = data.get('country_1')
+            country_2 = data.get('country_2')
+            date_start = data.get('date_start')
+            date_end = data.get('date_end')
+            eurozone_countries = [
+                "Austria", "Belgium", "Croatia", "Cyprus", "Estonia", "Finland", "France",
+                "Germany", "Greece", "Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg",
+                "Malta", "Netherlands", "Portugal", "Slovakia", "Slovenia", "Spain"
+            ]
+            if country_1  in eurozone_countries and country_2 in eurozone_countries:
+                return JsonResponse({'status': 'error', 'message': '两个欧元国家'})
+            else:
+                currency_1 = models.country_currency.objects.filter(country=country_1).first().currency
+                currency_2 = models.country_currency.objects.filter(country=country_2).first().currency
+                obj = models.date_currency_rate.objects.filter(currency_1=currency_1,currency_2=currency_2,date_gte=date_start,date_lte=date_end)
+                return JsonResponse({'status': 'correct', 'message': '获取成功','data':{'dates':obj.values_list('date', flat=True),'rates':obj.values_list('rate', flat=True)}})
+              
+        except json.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': '无效的 JSON 数据'}, status=400)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
