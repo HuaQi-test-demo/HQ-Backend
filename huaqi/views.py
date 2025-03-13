@@ -10,7 +10,7 @@ from huaqi import models
 # Create your views here.
 def login(request):
 
-    # 生成一个64字符的随机字母字符串
+   
 
     if request.method == "POST":
         data = json.loads(request.body)
