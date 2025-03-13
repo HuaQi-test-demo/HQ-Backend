@@ -10,8 +10,6 @@ from huaqi import models
 # Create your views here.
 def login(request):
 
-   
-
     if request.method == "POST":
         data = json.loads(request.body)
         username = data.get('username')
