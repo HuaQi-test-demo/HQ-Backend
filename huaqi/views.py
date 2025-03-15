@@ -9,7 +9,7 @@ from django.shortcuts import render,HttpResponse,redirect
 from huaqi import models
 # Create your views here.
 def login(request):
-
+    HttpResponse("hello world")
     if request.method == "POST":
         data = json.loads(request.body)
         username = data.get('username')
@@ -54,22 +54,23 @@ def login(request):
                  }
              }
          })
-        
+
 def register(request):
     if request.method == "POST":
         data = json.loads(request.body)
         username = data.get('username')
         password =data.get('password')
-        confirm_password =data.get('confirm_password')
-        user_type =data.get('user_type')
+        confirm_password =data.get('ConfirmPassword')
+        user_type =data.get('category')
         email =data.get('email')
-        account_name =data.get('account_name')
+        print(username,password,confirm_password,email)
+
         if password != confirm_password:
             return JsonResponse({'status': 'error', 'message': '两次密码不一致，请重新设置密码'})
         elif models.userInfo.objects.filter(name=username).exists():
             return JsonResponse({'status': 'error', 'message': '账号已存在，请换一个'})
         else:
-         models.userInfo.objects.create(name=username,password=password,user_type=user_type,email=email,account_name=account_name)
+         models.userInfo.objects.create(name=username,password=password,user_type=user_type,email=email)
          return JsonResponse({'status': 'ok', 'message': '注册成功'})
         
     # if request.method == "GET":

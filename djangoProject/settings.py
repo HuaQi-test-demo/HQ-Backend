@@ -23,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-0bqlss_*@z2)z$aer9d1x2==_2!wtilo=!hftjo!k-268(j^vd"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = []
 
@@ -76,16 +76,16 @@ WSGI_APPLICATION = "djangoProject.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-# DATABASES = {
-#     # "default": {
-#     #     "ENGINE": "django.db.backends.mysql",
-#     #     "NAME": "huaqi",
-#     #     "USER": "root",
-#     #     "PASSWORD": "12345678",
-#     #     "HOST": "127.0.0.1",
-#     #     "PORT": 3307,
-#     # }
-# }
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": "huaqi",
+        "USER": "root",
+        "PASSWORD": "root",
+        "HOST": "121.36.9.36",
+        "PORT": 3306,
+    }
+}
 
 
 # Password validation
