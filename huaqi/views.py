@@ -9,51 +9,51 @@ from django.shortcuts import render,HttpResponse,redirect
 from huaqi import models
 # Create your views here.
 def login(request):
-    HttpResponse("hello world")
-    if request.method == "POST":
-        data = json.loads(request.body)
-        username = data.get('username')
-        password =data.get('password')
-        print(username,password)
-        access_token=secrets.token_hex(32)
-        obj_user=models.userInfo.objects.filter(name=username,password=password).first()
-        # obj_user = ["k"]
-        if obj_user is not None :
-        #   print(obj_user.account_name)
-         #request.session['account_name'] = obj.account_name
-            #print(obj.account_name)
-            # redirect('/submit/')
-          return JsonResponse({
-             'success': True,
-             'message': '登录成功',
-             'data_user': {
-                 'user': {
-                     'name': obj_user.name,
-                     'user_password':obj_user.password,
-                     'type': obj_user.user_type,
-                     'account_name': obj_user.account_name,
-                     'email': obj_user.email,
-                     'accessToken': access_token,
-                 }
-             }
-          })
-        else:
-           print("shibai")
-           # 用户验证失败
-           return JsonResponse({
-             'success': False,
-             'message': '用户名或密码错误',
-             'data_user': {
-                 'user': {
-                     'name': None,
-                     'user_password':None,
-                     'type': None,
-                     'account_name': None,
-                     'email': None,
-                     'accessToken': None,
-                 }
-             }
-         })
+    return HttpResponse("hello world")
+    # if request.method == "POST":
+    #     data = json.loads(request.body)
+    #     username = data.get('username')
+    #     password =data.get('password')
+    #     print(username,password)
+    #     access_token=secrets.token_hex(32)
+    #     obj_user=models.userInfo.objects.filter(name=username,password=password).first()
+    #     # obj_user = ["k"]
+    #     if obj_user is not None :
+    #     #   print(obj_user.account_name)
+    #      #request.session['account_name'] = obj.account_name
+    #         #print(obj.account_name)
+    #         # redirect('/submit/')
+    #       return JsonResponse({
+    #          'success': True,
+    #          'message': '登录成功',
+    #          'data_user': {
+    #              'user': {
+    #                  'name': obj_user.name,
+    #                  'user_password':obj_user.password,
+    #                  'type': obj_user.user_type,
+    #                  'account_name': obj_user.account_name,
+    #                  'email': obj_user.email,
+    #                  'accessToken': access_token,
+    #              }
+    #          }
+    #       })
+    #     else:
+    #        print("shibai")
+    #        # 用户验证失败
+    #        return JsonResponse({
+    #          'success': False,
+    #          'message': '用户名或密码错误',
+    #          'data_user': {
+    #              'user': {
+    #                  'name': None,
+    #                  'user_password':None,
+    #                  'type': None,
+    #                  'account_name': None,
+    #                  'email': None,
+    #                  'accessToken': None,
+    #              }
+    #          }
+    #      })
 
 def register(request):
     if request.method == "POST":
