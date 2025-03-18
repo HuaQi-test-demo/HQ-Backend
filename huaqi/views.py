@@ -90,13 +90,13 @@ def register(request):
     #      models.userInfo.objects.create(name=new_username,password=new_password,user_type=new_user_type,email=new_email,account_name=new_account_name)
     #      return redirect('/login/')
 
-def table(request):
-    table_account_name=request.session['account_name']
-    if table_account_name is not None :
-      print(table_account_name)
-      return render(request,'table.html',{'table_account_name':table_account_name})
-    else:
-        return render(request,'login.html')
+# def table(request):
+#     table_account_name=request.session['account_name']
+#     if table_account_name is not None :
+#       print(table_account_name)
+#       return render(request,'table.html',{'table_account_name':table_account_name})
+#     else:
+#         return render(request,'login.html')
 
 def submit_view(request):
     #if request.method == "GET":
@@ -114,6 +114,31 @@ def submit_view(request):
                 "Germany", "Greece", "Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg",
                 "Malta", "Netherlands", "Portugal", "Slovakia", "Slovenia", "Spain"
             ]
+            if country=='United States':
+                obj_us=models.earth_rate.objects.filter(country='United_States').first()
+                return JsonResponse({'message': 'Hello from Django!',
+                                     'table_data': {
+                                         'currency': obj_us.currency,
+                                         'currency_sign': obj_us.currency_sign,
+                                         'currency1_name': obj_us.currency1_name,
+                                         'currency_rate1': obj_us.currency_rate1,
+                                         'currency2_name': obj_us.currency2_name,
+                                         'currency_rate2': obj_us.currency_rate2,
+                                         'currency3_name': obj_us.currency3_name,
+                                         'currency_rate3': obj_us.currency_rate3,
+                                         'currency4_name': obj_us.currency4_name,
+                                         'currency_rate4': obj_us.currency_rate4,
+                                         'currency5_name': obj_us.currency5_name,
+                                         'currency_rate5': obj_us.currency_rate5,
+                                         'currency6_name': obj_us.currency6_name,
+                                         'currency_rate6': obj_us.currency_rate6,
+                                         'currency7_name': obj_us.currency7_name,
+                                         'currency_rate7': obj_us.currency_rate7,
+                                         'currency8_name': obj_us.currency8_name,
+                                         'currency_rate8': obj_us.currency_rate8,
+                                         'currency9_name': obj_us.currency9_name,
+                                         'currency_rate9': obj_us.currency_rate9
+                                     }})
             if country in eurozone_countries:
                 obj_euro = models.earth_rate.objects.filter(country='EURO').first()
                 print(obj_euro.currency,obj_euro.currency_sign,obj_euro.currency_rate1)
