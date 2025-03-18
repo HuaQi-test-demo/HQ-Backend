@@ -232,289 +232,296 @@ def multi_currency(request):
             # 解析请求体中的 JSON 数据
             data = json.loads(request.body)
             max_drawdown = data.get("maxDrawdown")
-            dates = data.get('months')
+            dates = data.get('month')
+            print(max_drawdown,dates)
             # dates='2024-08-01'
             # max_drawdown=-0.5
             # print(dates,max_drawdown)
             # 查询数据库中指定日期的记录
-            queryset = models.ProcessedPreDrawdown.objects.filter(Date=dates)
-            if queryset is not None:
-                columns = [field.name for field in models.ProcessedPreDrawdown._meta.fields]
-                print(columns)
-                # 初始化结果对象
-                result = {
-                    "nodes": [
-                        {
-                            "color": "#F44336",
-                            "label": "USD（美元）",
-                            "attributes": {},
-                            "y": -434.4221,
-                            "x": -75.53079,
-                            "id": "usd",
-                            "size": 100.0
-                        },
-                        {
-                            "color": "#E91E63",
-                            "label": "EUR（欧元）",
-                            "attributes": {},
-                            "y": 41.25936,
-                            "x": 157.57562,
-                            "id": "eur",
-                            "size": 73.161194
-                        },
-                        {
-                            "color": "#03A9F4",
-                            "label": "JPY（日元）",
-                            "attributes": {},
-                            "y": 241.89249,
-                            "x": -147.57906,
-                            "id": "jpy",
-                            "size": 64.54965
-                        },
-                        {
-                            "color": "#EF5350",
-                            "label": "GBP（英镑）",
-                            "attributes": {},
-                            "y": -230.14833,
-                            "x": -644.2716,
-                            "id": "gbp",
-                            "size": 49.608772
-                        },
-                        {
-                            "color": "#EC407A",
-                            "label": "CNY（人民币）",
-                            "attributes": {},
-                            "y": 171.80579,
-                            "x": 599.53815,
-                            "id": "cny",
-                            "size": 48.6046
-                        },
-                        {
-                            "color": "#29B6F6",
-                            "label": "AUD（澳元）",
-                            "attributes": {},
-                            "y": -182.1726,
-                            "x": -479.44443,
-                            "id": "aud",
-                            "size": 43.21858
-                        },
-                        {
-                            "color": "#E57373",
-                            "label": "CAD（加元）",
-                            "attributes": {},
-                            "y": -265.6326,
-                            "x": 694.03375,
-                            "id": "cad",
-                            "size": 33.359425
-                        },
-                        {
-                            "color": "#F06292",
-                            "label": "CHF（瑞士法郎）",
-                            "attributes": {},
-                            "y": -224.0287,
-                            "x": 317.77667,
-                            "id": "chf",
-                            "size": 23.713282
-                        },
-                        {
-                            "color": "#EF9A9A",
-                            "label": "SGD（新加坡元）",
-                            "attributes": {},
-                            "y": 120.37976,
-                            "x": -710.59204,
-                            "id": "sgd",
-                            "size": 19.818306
-                        },
-                        {
-                            "color": "#F48FB1",
-                            "label": "KRW（韩元）",
-                            "attributes": {},
-                            "y": 294.88266,
-                            "x": -933.4234,
-                            "id": "krw",
-                            "size": 19.574871
-                        },
-                        {
-                            "color": "#4DD0E1",
-                            "label": "INR（印度卢比）",
-                            "attributes": {},
-                            "y": -380.16626,
-                            "x": 118.30771,
-                            "id": "inr",
-                            "size": 18.935852
-                        },
-                        {
-                            "color": "#EF9A9A",
-                            "label": "BRL（巴西雷亚尔）",
-                            "attributes": {},
-                            "y": 56.938953,
-                            "x": -895.56586,
-                            "id": "brl",
-                            "size": 17.475237
-                        },
-                        {
-                            "color": "#F48FB1",
-                            "label": "MXN（墨西哥比索）",
-                            "attributes": {},
-                            "y": -75.5553,
-                            "x": -880.5015,
-                            "id": "mxn",
-                            "size": 15.923333
-                        },
-                        {
-                            "color": "#81D4FA",
-                            "label": "SEK（瑞典克朗）",
-                            "attributes": {},
-                            "y": -542.05096,
-                            "x": 502.02698,
-                            "id": "sek",
-                            "size": 14.88873
-                        },
-                        {
-                            "color": "#FFCDD2",
-                            "label": "NOK（挪威克朗）",
-                            "attributes": {},
-                            "y": 34.348167,
-                            "x": -284.14108,
-                            "id": "nok",
-                            "size": 14.858301
-                        },
-                        {
-                            "color": "#F8BBD0",
-                            "label": "PLN（波兰兹罗提）",
-                            "attributes": {},
-                            "y": -389.02567,
-                            "x": -423.78125,
-                            "id": "pln",
-                            "size": 12.54566
-                        },
-                        {
-                            "color": "#B3E5FC",
-                            "label": "TRY（土耳其里拉）",
-                            "attributes": {},
-                            "y": -792.2076,
-                            "x": -998.14185,
-                            "id": "try",
-                            "size": 12.180507
-                        },
-                        {
-                            "color": "#E8EAF6",
-                            "label": "AED（阿联酋迪拉姆）",
-                            "attributes": {},
-                            "y": 695.1258,
-                            "x": 881.2038,
-                            "id": "aed",
-                            "size": 11.845781
-                        },
-                        {
-                            "color": "#FFEBEE",
-                            "label": "SAR（沙特里亚尔）",
-                            "attributes": {},
-                            "y": 264.84995,
-                            "x": -421.52237,
-                            "id": "sar",
-                            "size": 11.298051
-                        },
-                        {
-                            "color": "#FFEBEE",
-                            "label": "THB（泰铢）",
-                            "attributes": {},
-                            "y": 522.375,
-                            "x": -1089.2416,
-                            "id": "thb",
-                            "size": 11.237192
-                        },
-                        {
-                            "color": "#FFEBEE",
-                            "label": "IDR（印尼盾）",
-                            "attributes": {},
-                            "y": 378.15536,
-                            "x": -1150.2018,
-                            "id": "idr",
-                            "size": 10.81118
-                        },
-                        {
-                            "color": "#FCE4EC",
-                            "label": "ARS（阿根廷比索）",
-                            "attributes": {},
-                            "y": 649.42224,
-                            "x": 320.47504,
-                            "id": "ars",
-                            "size": 10.14173
-                        },
-                        {
-                            "color": "#E1F5FE",
-                            "label": "RUB（俄罗斯卢布）",
-                            "attributes": {},
-                            "y": -620.4443,
-                            "x": -586.76886,
-                            "id": "rub",
-                            "size": 10.020013
-                        }
-                    ],
-                    "edges": []
-                }
-                print(result)
-                # 遍历查询结果
-                for obj in queryset:
-                    # 遍历所有列名，找到形如 A_B 的列
-                    for col in columns:
-                        if '_' in col and col.split('_')[0] != col.split('_')[1]:
-                            # 提取货币对
-                            currency_pair = col.split('_')
-                            currency_a = currency_pair[0]
-                            currency_b = currency_pair[1]
-
-                            # 获取当前列的值
-                            drawdown_value = getattr(obj, col)
-
-                            # 计算比例
-                            if max_drawdown != 0:
-                                ratio = drawdown_value / max_drawdown
-                            else:
-                                ratio = 0
-
-                            # 将比例填入对应货币对的 edge 部分
-                            # 查找是否已经存在该货币对的 edge（无论是 A_B 还是 B_A）
-                            existing_edge_ab = next((edge for edge in result['edges'] if
-                                                     edge['sourceID'] == currency_a and edge['targetID'] == currency_b),
-                                                    None)
-                            existing_edge_ba = next((edge for edge in result['edges'] if
-                                                     edge['sourceID'] == currency_b and edge['targetID'] == currency_a),
-                                                    None)
-
-                            if existing_edge_ab:
-                                existing_edge_ab['size'] = ratio
-                            elif existing_edge_ba:
-                                existing_edge_ba['size'] = ratio
-                            else:
-                                # 如果不存在，则添加新的 edge
-                                result['edges'].append({
-                                    "sourceID": currency_a,
-                                    "targetID": currency_b,
-                                    "attributes": {},
-                                    "size": ratio
-                                })
-                # print(result)
-                #
-                #
-                # save_path = r'F:\GCN3.17\5_years\result.json'
-                #
-                #
-                # with open(save_path, 'w') as json_file:
-                #    json.dump(result, json_file, indent=4)
-
-                # print(f"JSON 文件已保存到：{save_path}")
-
-                return JsonResponse(result)
-
-            else:
-                result={"nodes":"没东西","edges":'没东西'}
-                return JsonResponse(result)
+            queryset_pre_5 = models.ProcessedPreDrawdown.objects.filter(Date=dates)
+            queryset_tar_5=models.ProcessedTarDrawdown.objects.filter(Date=dates)
+            result1=find_multi_currency(queryset_pre_5,max_drawdown)
+            result2=find_multi_currency(queryset_tar_5,max_drawdown)
+            return JsonResponse({'result1':result1,'result2':result2})
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
      else:
         return JsonResponse({"error": "Invalid request method"}, status=405)
+def find_multi_currency(queryset,max_drawdown):
+    if queryset is not None:
+        columns = [field.name for field in models.ProcessedPreDrawdown._meta.fields]
+        print(columns)
+        # 初始化结果对象
+        result = {
+            "nodes": [
+                {
+                    "color": "#F44336",
+                    "label": "USD（美元）",
+                    "attributes": {},
+                    "y": -434.4221,
+                    "x": -75.53079,
+                    "id": "usd",
+                    "size": 100.0
+                },
+                {
+                    "color": "#E91E63",
+                    "label": "EUR（欧元）",
+                    "attributes": {},
+                    "y": 41.25936,
+                    "x": 157.57562,
+                    "id": "eur",
+                    "size": 73.161194
+                },
+                {
+                    "color": "#03A9F4",
+                    "label": "JPY（日元）",
+                    "attributes": {},
+                    "y": 241.89249,
+                    "x": -147.57906,
+                    "id": "jpy",
+                    "size": 64.54965
+                },
+                {
+                    "color": "#EF5350",
+                    "label": "GBP（英镑）",
+                    "attributes": {},
+                    "y": -230.14833,
+                    "x": -644.2716,
+                    "id": "gbp",
+                    "size": 49.608772
+                },
+                {
+                    "color": "#EC407A",
+                    "label": "CNY（人民币）",
+                    "attributes": {},
+                    "y": 171.80579,
+                    "x": 599.53815,
+                    "id": "cny",
+                    "size": 48.6046
+                },
+                {
+                    "color": "#29B6F6",
+                    "label": "AUD（澳元）",
+                    "attributes": {},
+                    "y": -182.1726,
+                    "x": -479.44443,
+                    "id": "aud",
+                    "size": 43.21858
+                },
+                {
+                    "color": "#E57373",
+                    "label": "CAD（加元）",
+                    "attributes": {},
+                    "y": -265.6326,
+                    "x": 694.03375,
+                    "id": "cad",
+                    "size": 33.359425
+                },
+                {
+                    "color": "#F06292",
+                    "label": "CHF（瑞士法郎）",
+                    "attributes": {},
+                    "y": -224.0287,
+                    "x": 317.77667,
+                    "id": "chf",
+                    "size": 23.713282
+                },
+                {
+                    "color": "#EF9A9A",
+                    "label": "SGD（新加坡元）",
+                    "attributes": {},
+                    "y": 120.37976,
+                    "x": -710.59204,
+                    "id": "sgd",
+                    "size": 19.818306
+                },
+                {
+                    "color": "#F48FB1",
+                    "label": "KRW（韩元）",
+                    "attributes": {},
+                    "y": 294.88266,
+                    "x": -933.4234,
+                    "id": "krw",
+                    "size": 19.574871
+                },
+                {
+                    "color": "#4DD0E1",
+                    "label": "INR（印度卢比）",
+                    "attributes": {},
+                    "y": -380.16626,
+                    "x": 118.30771,
+                    "id": "inr",
+                    "size": 18.935852
+                },
+                {
+                    "color": "#EF9A9A",
+                    "label": "BRL（巴西雷亚尔）",
+                    "attributes": {},
+                    "y": 56.938953,
+                    "x": -895.56586,
+                    "id": "brl",
+                    "size": 17.475237
+                },
+                {
+                    "color": "#F48FB1",
+                    "label": "MXN（墨西哥比索）",
+                    "attributes": {},
+                    "y": -75.5553,
+                    "x": -880.5015,
+                    "id": "mxn",
+                    "size": 15.923333
+                },
+                {
+                    "color": "#81D4FA",
+                    "label": "SEK（瑞典克朗）",
+                    "attributes": {},
+                    "y": -542.05096,
+                    "x": 502.02698,
+                    "id": "sek",
+                    "size": 14.88873
+                },
+                {
+                    "color": "#FFCDD2",
+                    "label": "NOK（挪威克朗）",
+                    "attributes": {},
+                    "y": 34.348167,
+                    "x": -284.14108,
+                    "id": "nok",
+                    "size": 14.858301
+                },
+                {
+                    "color": "#F8BBD0",
+                    "label": "PLN（波兰兹罗提）",
+                    "attributes": {},
+                    "y": -389.02567,
+                    "x": -423.78125,
+                    "id": "pln",
+                    "size": 12.54566
+                },
+                {
+                    "color": "#B3E5FC",
+                    "label": "TRY（土耳其里拉）",
+                    "attributes": {},
+                    "y": -792.2076,
+                    "x": -998.14185,
+                    "id": "try",
+                    "size": 12.180507
+                },
+                {
+                    "color": "#E8EAF6",
+                    "label": "AED（阿联酋迪拉姆）",
+                    "attributes": {},
+                    "y": 695.1258,
+                    "x": 881.2038,
+                    "id": "aed",
+                    "size": 11.845781
+                },
+                {
+                    "color": "#FFEBEE",
+                    "label": "SAR（沙特里亚尔）",
+                    "attributes": {},
+                    "y": 264.84995,
+                    "x": -421.52237,
+                    "id": "sar",
+                    "size": 11.298051
+                },
+                {
+                    "color": "#FFEBEE",
+                    "label": "THB（泰铢）",
+                    "attributes": {},
+                    "y": 522.375,
+                    "x": -1089.2416,
+                    "id": "thb",
+                    "size": 11.237192
+                },
+                {
+                    "color": "#FFEBEE",
+                    "label": "IDR（印尼盾）",
+                    "attributes": {},
+                    "y": 378.15536,
+                    "x": -1150.2018,
+                    "id": "idr",
+                    "size": 10.81118
+                },
+                {
+                    "color": "#FCE4EC",
+                    "label": "ARS（阿根廷比索）",
+                    "attributes": {},
+                    "y": 649.42224,
+                    "x": 320.47504,
+                    "id": "ars",
+                    "size": 10.14173
+                },
+                {
+                    "color": "#E1F5FE",
+                    "label": "RUB（俄罗斯卢布）",
+                    "attributes": {},
+                    "y": -620.4443,
+                    "x": -586.76886,
+                    "id": "rub",
+                    "size": 10.020013
+                }
+            ],
+            "edges": []
+        }
+
+        # 遍历查询结果
+        for obj in queryset:
+            # 遍历所有列名，找到形如 A_B 的列
+            for col in columns:
+                if '_' in col and col.split('_')[0] != col.split('_')[1]:
+                    # 提取货币对
+                    currency_pair = col.split('_')
+                    currency_a = currency_pair[0]
+                    currency_b = currency_pair[1]
+
+                    # 获取当前列的值
+                    drawdown_value = getattr(obj, col)
+
+                    # 计算比例
+                    if max_drawdown != 0:
+                        ratio = drawdown_value / max_drawdown
+                    else:
+                        ratio = 0
+
+                    # 将比例填入对应货币对的 edge 部分
+                    # 查找是否已经存在该货币对的 edge（无论是 A_B 还是 B_A）
+                    existing_edge_ab = next((edge for edge in result['edges'] if
+                                             edge['sourceID'] == currency_a and edge['targetID'] == currency_b),
+                                            None)
+                    existing_edge_ba = next((edge for edge in result['edges'] if
+                                             edge['sourceID'] == currency_b and edge['targetID'] == currency_a),
+                                            None)
+
+                    if existing_edge_ab:
+                        existing_edge_ab['size'] = ratio
+                    elif existing_edge_ba:
+                        existing_edge_ba['size'] = ratio
+                    else:
+                        # 如果不存在，则添加新的 edge
+                        result['edges'].append({
+                            "sourceID": currency_a,
+                            "targetID": currency_b,
+                            "attributes": {},
+                            "size": ratio
+                        })
+        print(result)
+        #
+        #
+        # save_path = r'F:\GCN3.17\5_years\result.json'
+        #
+        #
+        # with open(save_path, 'w') as json_file:
+        #    json.dump(result, json_file, indent=4)
+
+        # print(f"JSON 文件已保存到：{save_path}")
+
+
+
+    # else:
+    #     result = {"nodes": "没东西", "edges": '没东西'}
+    #
+    return result
 # def deepseek_generate(request):
 #     if request.method == "POST":
 #         data = json.loads(request.body)
