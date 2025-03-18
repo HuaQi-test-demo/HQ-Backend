@@ -231,8 +231,8 @@ def multi_currency(request):
         try:
             # 解析请求体中的 JSON 数据
             data = json.loads(request.body)
-            max_drawdown = data.get("max_drawdown")
-            dates = data.get('dates')
+            max_drawdown = data.get("maxDrawdown")
+            dates = data.get('months')
             # dates='2024-08-01'
             # max_drawdown=-0.5
             # print(dates,max_drawdown)
