@@ -1719,3 +1719,8 @@ class ProcessedTarDrawdown(models.Model):
     try_try = models.FloatField(db_column='TRY_TRY', blank=True, null=True)  # Field name made lowercase.
     try_usd = models.FloatField(db_column='TRY_USD', blank=True, null=True)  # Field name made lowercase.
     usd_usd = models.FloatField(db_column='USD_USD', blank=True, null=True)  # Field name made lowercase.
+class news_2024(models.Model):
+    Title = models.TextField()
+    Date = models.DateField()
+    Content=models.TextField()
+    Countries=models.TextField()

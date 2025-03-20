@@ -3,10 +3,12 @@ import string
 from dbm import error
 import secrets
 from os import access
-
+import openai
 from django.db.models.expressions import result
 from django.http import JsonResponse
 from django.shortcuts import render,HttpResponse,redirect
+from openai import OpenAI
+
 from huaqi import models
 # Create your views here.
 def login(request):
@@ -522,7 +524,91 @@ def find_multi_currency(queryset,max_drawdown):
     #     result = {"nodes": "没东西", "edges": '没东西'}
     #
     return result
-# def deepseek_generate(request):
-#     if request.method == "POST":
-#         data = json.loads(request.body)
-#         dates=
+def deepseek_generate(self,dates_begin,dates_end,currency_pair):
+        table_names = [
+            'max_drawdown_table',  # 最大回撤关系表
+            'exchange_rate_volatility_table',  # 汇率波动情况表
+            'exchange_rate_policies_table',  # 各国汇率政策表
+            'geopolitical_factors_table'  # 地缘政治因素表
+        ]
+
+        # 从数据库中获取数据
+        data_dict = self.get_data_from_db(table_names,dates_begin,dates_end,currency_pair)
+
+        # 根据数据库中的数据组织一次提问
+        query = self.generate_query(currency_pair, data_dict)
+
+        # 使用大模型进行回答
+        response_ai = self.chat_completions(query)
+        return JsonResponse({'response':response_ai})
+def get_data_from_db(self, table_names, dates_begin, dates_end, currency_pair):
+    data_dict = {}
+    return data_dict
+
+def generate_query(self, currency_pair, data_dict):
+        """
+        根据数据库中的数据组织一次提问
+        :param currency_pair: 货币对名称
+        :param data_dict: 包含从数据库中获取的数据的字典
+        :return: 按照模板格式生成的提问
+        """
+        template = """该货币对名称:{}
+        和最大回撤关系:{}
+        汇率波动情况:{}
+        各国汇率政策:{}
+        地缘政治因素:{}"""
+
+        # 按照模板格式生成提问
+        query = template.format(
+            currency_pair,
+            data_dict.get("max_drawdown_table", "无相关数据"),
+            data_dict.get("exchange_rate_volatility_table", "无相关数据"),
+            data_dict.get("exchange_rate_policies_table", "无相关数据"),
+            data_dict.get("geopolitical_factors_table", "无相关数据")
+        )
+        return query
+
+def chat_completions(self, query):
+        """
+        调用 OpenAI API 获取回答
+        :param query: 提问内容
+        :return: 大模型的回答
+        """
+        client = OpenAI(api_key="<DeepSeek API Key>", base_url="https://api.deepseek.com")
+
+
+        # 定义回答模板
+        response_template = """
+        根据以上信息和该货币对在网络上的公开信息，你的任务是从专业的角度分点简要总结该货币对的汇率风险信号，只需得出结论即可。
+
+        要求如下：
+        1.不允许在答案中添加编造成分；
+        2.引用行业相关术语，突显专业性；
+        3.答案请使用中文，字数在350字以内；
+        4.将你的回答分点列出，确保逻辑清晰；
+        5.使用段落结构，输出的每段文字的首行缩进2个中文字符，段落之间无空行，保持格式整洁美观；
+        6.输出格式请严格参照示例的输出格式。
+
+        示例：
+        输出格式：
+        1. 人民币兑美元汇率近期波动加剧，从7.17附近波动至7.26附近，短期内波动幅度超过1%。市场交投情绪谨慎，日均波动幅度扩大至0.5%-1.0%。
+        2. 和最大回撤关系显示，近期人民币汇率的波动导致投资者面临较大的回撤风险，特别是在市场情绪波动较大的时段。
+        3. 汇率波动情况方面，人民币兑美元汇率在亚洲时段和美国时段波动较为明显，受经济数据公布和央行官员讲话影响较大。技术指标上，MACD出现死叉，RSI指标处于超卖状态。
+        4. 各国汇率政策对汇率影响显著，中国央行通过发行央行票据收紧离岸市场流动性，稳定人民币汇率。美国方面，美联储的货币政策调整也对汇率产生了间接影响。
+        5. 地缘政治因素增加了市场的不确定性，例如美国新政府的贸易政策动向，这是当前牵动美元指数及特定经济体货币汇率的一个关键因素。
+        6. 综合来看，人民币兑美元汇率市场目前处于波动风险加剧的状态，多空力量在关键点位附近博弈。投资者需密切关注央行的货币政策动态以及宏观经济数据发布，以把握潜在的交易机会和风险控制。
+        """
+
+        # 将提问和回答模板一起发送给大模型
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": "You are a helpful master of the foreign exchange market."},
+                {"role": "user", "content": query + response_template}
+            ]
+        )
+
+        try:
+            return response.choices[0].message.content
+        except TypeError:
+            return "服务器发生错误，生成失败"
