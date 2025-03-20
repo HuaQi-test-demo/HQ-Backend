@@ -202,15 +202,21 @@ def submit_view(request):
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
-def select_twe_countries(request):
+def currency_pair(request):
     if request.method == 'POST':
         try:
             # 获取前端发送的 JSON 数据
             data = json.loads(request.body)
-            country_1 = data.get('country_1')
-            country_2 = data.get('country_2')
-            date_start = data.get('date_start')
-            date_end = data.get('date_end')
+            countries = data.get('countries')
+            print(countries)
+            country_1 = countries[0]
+            print(country_1)
+            country_2 = countries[1]
+            print(country_2)
+            deal_year = ''+data.get('investmentPeriod')+'年'
+            print(deal_year)
+            date_start = data.get('startDate')
+            date_end = data.get('endDate')
             eurozone_countries = [
                 "Austria", "Belgium", "Croatia", "Cyprus", "Estonia", "Finland", "France",
                 "Germany", "Greece", "Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg",
@@ -219,15 +225,24 @@ def select_twe_countries(request):
             if country_1  in eurozone_countries and country_2 in eurozone_countries:
                 return JsonResponse({'status': 'error', 'message': '两个欧元国家'})
             else:
+                if country_1 == 'United States' :
+                     country_1 = 'United_States'
+                if country_2 == 'United States' :
+                     country_2 = 'United_States'
                 currency_1 = models.country_currency.objects.filter(country=country_1).first().currency
                 currency_2 = models.country_currency.objects.filter(country=country_2).first().currency
-                obj = models.date_currency_rate.objects.filter(currency_1=currency_1,currency_2=currency_2,date_gte=date_start,date_lte=date_end)
-                return JsonResponse({'status': 'correct', 'message': '获取成功','data':{'dates':obj.values_list('date', flat=True),'rates':obj.values_list('rate', flat=True)}})
-              
+                obj = models.date_currency_rates.objects.filter(currency_1=currency_1,currency_2=currency_2,date_time_gte=date_start,date_time_lte=date_end,deal_year=deal_year)
+                return JsonResponse({'status': 'correct', 
+                                     'message': '获取成功',
+                                     'data':{
+                                         'date_time':obj.values_list('date_time', flat=True),
+                                         'predict_rate':obj.values_list('predict_rate', flat=True),
+                                         'true_rate':obj.values_list('true_rate', flat=True)}})
         except json.JSONDecodeError:
             return JsonResponse({'status': 'error', 'message': '无效的 JSON 数据'}, status=400)
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        
 def multi_currency(request):
      if request.method == 'POST':
         try:
