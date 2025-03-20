@@ -225,6 +225,10 @@ def currency_pair(request):
             if country_1  in eurozone_countries and country_2 in eurozone_countries:
                 return JsonResponse({'status': 'error', 'message': '两个欧元国家'})
             else:
+                if country_1 == 'United States' :
+                     country_1 = 'United_States'
+                if country_2 == 'United States' :
+                     country_2 = 'United_States'
                 currency_1 = models.country_currency.objects.filter(country=country_1).first().currency
                 currency_2 = models.country_currency.objects.filter(country=country_2).first().currency
                 obj = models.date_currency_rates.objects.filter(currency_1=currency_1,currency_2=currency_2,date_time_gte=date_start,date_time_lte=date_end,deal_year=deal_year)
