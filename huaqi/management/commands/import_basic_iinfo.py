@@ -1,7 +1,7 @@
 import csv
 import os
 from django.core.management.base import BaseCommand
-from huaqi.models import policy_2024  # 替换为你的应用名称
+from huaqi.models import basic_info_2024  # 替换为你的应用名称
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'your_project.settings')
 
@@ -18,12 +18,16 @@ class Command(BaseCommand):
             # 打印列名
             print("CSV file column names:", csv_reader.fieldnames)
             for row in csv_reader:
-                news_entry = policy_2024()
+                news_entry = basic_info_2024()
                 news_entry.Date = row.get('Date')  # 使用 get 方法避免 KeyError
                 if not news_entry.Date:  # 如果 Date 列为空，跳过这一行
                     continue
-                news_entry.affect_currency = row.get('affect_currency')
-                news_entry.affect_country = row.get('affect_country')
-                news_entry.text_vectors = row.get('text_vectors')
+                news_entry.currency = row.get('currency')
+                news_entry.cpi = row.get('cpi')
+                news_entry.gdp = row.get('gdp')
+                news_entry.pmi = row.get('pmi')
+                news_entry.ppi = row.get('ppi')
+                news_entry.cci = row.get('cci')
+                news_entry.unemployment = row.get('unemployment')
                 news_entry.save()
         self.stdout.write(self.style.SUCCESS('Successfully imported data from CSV file'))

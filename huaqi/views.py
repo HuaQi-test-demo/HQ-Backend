@@ -4,6 +4,7 @@ from dbm import error
 import secrets
 from os import access
 import openai
+from django.db.models import Q
 from django.db.models.expressions import result
 from django.http import JsonResponse
 from django.shortcuts import render,HttpResponse,redirect
@@ -539,28 +540,79 @@ def find_multi_currency(queryset,max_drawdown):
     #     result = {"nodes": "没东西", "edges": '没东西'}
     #
     return result
-def deepseek_generate(self,dates_begin,dates_end,currency_pair):
-        table_names = [
-            'max_drawdown_table',  # 最大回撤关系表
-            'exchange_rate_volatility_table',  # 汇率波动情况表
-            'exchange_rate_policies_table',  # 各国汇率政策表
-            'geopolitical_factors_table'  # 地缘政治因素表
-        ]
+def deepseek_generate(self,dates_begin,dates_end,currency_pair,countries,drawdown,maxdrawdown,identify):
 
         # 从数据库中获取数据
-        data_dict = self.get_data_from_db(table_names,dates_begin,dates_end,currency_pair)
+        data_dict = self.get_data_from_db(dates_begin,dates_end,currency_pair,countries,drawdown)
 
         # 根据数据库中的数据组织一次提问
-        query = self.generate_query(currency_pair, data_dict)
+        query = self.generate_query(currency_pair, data_dict,maxdrawdown,identify)
 
         # 使用大模型进行回答
         response_ai = self.chat_completions(query)
         return JsonResponse({'response':response_ai})
-def get_data_from_db(self, table_names, dates_begin, dates_end, currency_pair):
+def get_data_from_db(self, dates_begin, dates_end, currency_pair,countries,drwadown):
     data_dict = {}
+    try:
+        data_dict['dates_begin']=dates_begin
+        data_dict['dates_end']=dates_end
+        data_dict['drawdown']=drwadown
+
+        # 处理policy_2024表（汇率政策）
+        currency1, currency2 = currency_pair.split(',')
+        policy_records = models.policy_2024.objects.filter(
+            Date__range=[dates_begin, dates_end]
+        ).filter(
+            Q(affect_currency__contains=currency1) |
+            Q(affect_currency__contains=currency2)
+        )
+        data_dict['policy'] = [p.text_vectors for p in policy_records]
+
+        # 处理news_2024表（地缘政治）
+        if isinstance(countries, str):
+            countries = countries.split(';')
+        country_query = Q()
+        for country in countries:
+            country_query |= Q(Countries__contains=country.strip())
+
+        news_records =models.news_2024.objects.filter(
+            Date__range=[dates_begin, dates_end]
+        ).filter(country_query)
+        data_dict['news'] = [n.Content for n in news_records]
+
+        # 处理basic_info_2024表（经济指标）
+        basic_records = models.basic_info_2024.objects.filter(
+            Date__range=[dates_begin, dates_end],
+            currency__in=[currency1, currency2]
+        ).values('cpi', 'gdp', 'pmi', 'ppi', 'cci', 'unemployment')
+
+        # 将QuerySet转换为字典列表，并处理字段类型
+        formatted_records = []
+        for record in basic_records:
+            formatted = {k: float(v) if v.replace('.', '', 1).isdigit() else v
+                         for k, v in record.items()}
+            formatted_records.append(formatted)
+
+        data_dict['basic_info'] = formatted_records
+
+
+
+    except Exception as e:
+        print(f"Database query error: {str(e)}")
+        return {
+            'dates_begin': [],
+            'dates_end': [],
+            'drawdown': [],
+
+            'policy':[],
+            'news':[],
+            'basic_info':[]
+        }
+
     return data_dict
 
-def generate_query(self, currency_pair, data_dict):
+
+def generate_query(self, currency_pair, data_dict,maxdrawdown,identify):
         """
         根据数据库中的数据组织一次提问
         :param currency_pair: 货币对名称
@@ -568,18 +620,27 @@ def generate_query(self, currency_pair, data_dict):
         :return: 按照模板格式生成的提问
         """
         template = """该货币对名称:{}
-        和最大回撤关系:{}
-        汇率波动情况:{}
+        预测风险开始时间:{}
+        预测风险结束时间:{}
+        当前回撤:{}
+        最大回撤:{}
+        各国经济指标:{}
         各国汇率政策:{}
-        地缘政治因素:{}"""
+        地缘政治因素:{}
+        身份信息:{}
+        """
 
         # 按照模板格式生成提问
         query = template.format(
             currency_pair,
-            data_dict.get("max_drawdown_table", "无相关数据"),
-            data_dict.get("exchange_rate_volatility_table", "无相关数据"),
-            data_dict.get("exchange_rate_policies_table", "无相关数据"),
-            data_dict.get("geopolitical_factors_table", "无相关数据")
+            data_dict.get("dates_begin", "无相关数据"),
+            data_dict.get("dates_end", "无相关数据"),
+            data_dict.get("drawdown", "无相关数据"),
+            maxdrawdown,
+            data_dict.get("policy", "无相关数据"),
+            data_dict.get("news", "无相关数据"),
+            data_dict.get("basic_info", "无相关数据"),
+            identify
         )
         return query
 
@@ -594,24 +655,73 @@ def chat_completions(self, query):
 
         # 定义回答模板
         response_template = """
-        根据以上信息和该货币对在网络上的公开信息，你的任务是从专业的角度分点简要总结该货币对的汇率风险信号，只需得出结论即可。
+        根据以上信息和该货币对在网络上的公开信息，你的任务是从专业的角度分点简要总结该货币对的汇率风险信号，并且注意根据身份信息生成针对不同人群的风险报告。
 
         要求如下：
         1.不允许在答案中添加编造成分；
         2.引用行业相关术语，突显专业性；
-        3.答案请使用中文，字数在350字以内；
+        3.答案请使用中文，字数在700字以内；
         4.将你的回答分点列出，确保逻辑清晰；
         5.使用段落结构，输出的每段文字的首行缩进2个中文字符，段落之间无空行，保持格式整洁美观；
         6.输出格式请严格参照示例的输出格式。
+        7.根据不同的身份信息给出具有针对性的报告
+        8.给出的建议要切实有效
 
         示例：
         输出格式：
-        1. 人民币兑美元汇率近期波动加剧，从7.17附近波动至7.26附近，短期内波动幅度超过1%。市场交投情绪谨慎，日均波动幅度扩大至0.5%-1.0%。
-        2. 和最大回撤关系显示，近期人民币汇率的波动导致投资者面临较大的回撤风险，特别是在市场情绪波动较大的时段。
-        3. 汇率波动情况方面，人民币兑美元汇率在亚洲时段和美国时段波动较为明显，受经济数据公布和央行官员讲话影响较大。技术指标上，MACD出现死叉，RSI指标处于超卖状态。
-        4. 各国汇率政策对汇率影响显著，中国央行通过发行央行票据收紧离岸市场流动性，稳定人民币汇率。美国方面，美联储的货币政策调整也对汇率产生了间接影响。
-        5. 地缘政治因素增加了市场的不确定性，例如美国新政府的贸易政策动向，这是当前牵动美元指数及特定经济体货币汇率的一个关键因素。
-        6. 综合来看，人民币兑美元汇率市场目前处于波动风险加剧的状态，多空力量在关键点位附近博弈。投资者需密切关注央行的货币政策动态以及宏观经济数据发布，以把握潜在的交易机会和风险控制。
+       人民币兑美元（USD/CNY）汇率风险深度分析报告
+        一、波动周期分析
+             ·  当前回撤达{2.9}%，接近您设置的{3}%
+                风险窗口：{2024-7-1}至{2024-8-1}
+
+      二、驱动要素深度解析
+1. 经济基本面裂变
+  ·  通胀剪刀差加剧：美国核心CPI维持3.5%高位（住房项贡献58%），中国PPI连续11个月负增长（-1.4%），创2016年来最长通缩周期
+  ·  增长动能分化：美国Q2 GDP季调年率2.4% vs 中国6月制造业PMI 49.0（连续3月收缩）
+  ·  利率悬崖效应：中美10年期国债利差-215BP，倒挂幅度超2008金融危机峰值（-189BP），触发跨境套利资本日均流出5.2亿美元
+
+2. 政策多维博弈
+  ·  中国央行精准滴灌：
+     - MLF连续8周净投放5300亿（利率锚定2.5%）
+     - 启动离岸央票增发（500亿规模，期限63天）
+     - 窗口指导主要银行将结售汇点差压缩至25BP以内
+  ·  美联储双重紧缩：
+     - 资产负债表缩减950亿/月（MBS减持上限300亿）
+     - 逆回购池维持2.1万亿美元超额流动性
+     - 利率点阵图隐含2024年降息空间收窄至25BP
+  ·  监管科技升级：外汇局跨境金融区块链平台新增"热钱追踪"模块，实时监控1400余家机构外汇头寸
+
+3. 地缘冲击波传导
+  ·  贸易战2.0升级：
+     - 电动车关税7月生效（影响240亿美元贸易额）
+     - 半导体设备出口新规覆盖28nm以下制程
+     - 生物技术投资审查清单扩容至37个领域
+  ·  资本暗流涌动：
+     - 股票市场：EPFR监测显示47亿美元净流出（主动型基金占比73%）
+     - 债券市场：境外机构连续9月减持人民币债券（累计4820亿）
+     - 直接投资：Q2对华绿地投资同比下降39%（美国企业降幅达58%）
+  ·  货币武器化风险：SWIFT数据显示38个国家增加人民币结算占比，但美元仍主导83%能源交易
+
+三、分层应对策略
+  [个人投资者]
+  1. 购汇策略：采用"3-5-2"分批操作（7.25购30%、破7.20追50%、7.30保底20%）
+  2. 持汇管理：美元现钞占比≤40%，推荐配置工行"双币宝"（保本收益率2.8%）
+  3. 留学缴费：优先使用中行"优汇通"锁定6个月汇率（点差优惠15BP）
+
+  [商业银行]
+  1. 风险管控：设置三级预警（7.25黄色预警/7.28橙色预警/7.30红色预警）
+  2. 产品设计：推出"鲨鱼鳍"结构性存款（执行价7.15-7.35，预期年化3.6-5.2%）
+  3. 客户管理：企业客户保证金比例提升至110%（原100%），追加频率每日16:00前
+
+  [跨国企业]
+  1. 自然对冲：调整东南亚供应链账期至60天（原90天），匹配82%的应收应付
+  2. 金融对冲：买入3个月期7.30看跌期权（权利金0.8%），覆盖65%敞口
+  3. 结算优化：对欧贸易采用35%欧元+65%人民币结算，汇损降低0.4个百分点
+
+监测机制：
+·  每日跟踪CFETS人民币汇率指数、USDCNY 1M ATM波动率等12项指标
+·  当中间价连续3日偏离±1%时，启动跨境融资宏观审慎调节
+·  每周更新GARCH模型预测区间（95%置信水平：7.15-7.33）交易机会和风险控制。
         """
 
         # 将提问和回答模板一起发送给大模型
