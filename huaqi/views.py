@@ -263,6 +263,7 @@ def currency_pair(request):
             date_end = date_end.strftime("%Y-%m-%d")
             # date_end = pd.to_datetime(data.get('endDate'))
             print(date_end)
+            maxDrawdown = data.get('maxDrawdown')
             eurozone_countries = [
                 "Austria", "Belgium", "Croatia", "Cyprus", "Estonia", "Finland", "France",
                 "Germany", "Greece", "Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg",
@@ -306,15 +307,22 @@ def currency_pair(request):
                 percentiles = {0.25:0.0008, 0.50:0.0101, 0.75:0.1020, 0.90:1.5048}
                 volatility_rate = rate_volatility(std_dev, percentiles)
                 print(volatility_rate)
-                maxx = max_drawdown(df)
-                print(maxx)
+                maxdd = 0-max_drawdown(df)*100
+                print(maxdd)
+                if(maxDrawdown > maxdd):
+                    is_risk = False
+                else:
+                    is_risk = True
+                ai_result =  deepseek_generate(date_start,date_end,[currency_1,currency_2],[country_1,country_2],maxdd,maxDrawdown,'个人',std_dev)
                 return JsonResponse({'message': '获取成功',
                                      'data':{
                                          'date_time':date_time_list,
                                          'predict_rate':predict_rate_list,
                                          'true_rate':true_rate_list,
                                          'volatility_rate':volatility_rate,
-                                         'max_drawdown':maxx,
+                                         'max_drawdown':maxdd,
+                                         'is_risk':is_risk,
+                                         'ai_result':ai_result
                                          }
                                     },status=201)
         # except json.JSONDecodeError:
@@ -628,7 +636,7 @@ def deepseek_generate(dates_begin,dates_end,currency_pair,countries,drawdown,max
 
         # 使用大模型进行回答
         response_ai = chat_completions(query)
-        return JsonResponse({'response':response_ai})
+        return response_ai
 
 def get_data_from_db(dates_begin, dates_end, currency_pair,countries,drwadown):
     data_dict = {}
