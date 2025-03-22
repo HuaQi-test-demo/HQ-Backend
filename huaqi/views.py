@@ -628,7 +628,7 @@ def deepseek_generate(dates_begin,dates_end,currency_pair,countries,drawdown,max
 
         # 使用大模型进行回答
         response_ai = chat_completions(query)
-        return JsonResponse({'response':response_ai})
+        return {'response':response_ai}
 
 def get_data_from_db(dates_begin, dates_end, currency_pair,countries,drwadown):
     data_dict = {}
