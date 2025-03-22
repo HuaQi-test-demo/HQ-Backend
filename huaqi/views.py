@@ -9,7 +9,9 @@ from django.db.models.expressions import result
 from django.http import JsonResponse
 from django.shortcuts import render,HttpResponse,redirect
 from openai import OpenAI
-
+import pandas as pd
+import numpy as np
+from datetime import datetime
 from huaqi import models
 # Create your views here.
 def login(request):
@@ -202,8 +204,39 @@ def submit_view(request):
             return JsonResponse({'status': 'error', 'message': '无效的 JSON 数据'}, status=400)
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+# 波动率评级函数
+def rate_volatility(std_dev, percentiles):
+    if std_dev < percentiles[0.25]:
+        return '低波动性'
+    elif std_dev < percentiles[0.5]:
+        return '较低波动性'
+    elif std_dev < percentiles[0.75]:
+        return '中等波动性'
+    elif std_dev < percentiles[0.90]:
+        return '较高波动性'
+    else:
+        return '高波动性'
+
+def max_drawdown(df):
+    """计算最大回撤"""
+    if df.empty:
+        print("!!!该时间段无数据")
+        return 0
+
+    # 记录最大回撤
+    mdd = 0  
+    peak = df['predict_rate'].iloc[0]  # 记录最高点（初始化为第一个值）
+
+    for price in df['predict_rate']:
+        if price > peak:
+            peak = price  # 更新最高点
+        drawdown = (price - peak) / peak  # 计算当前回撤
+        mdd = min(mdd, drawdown)  # 记录最大回撤
+
+    return mdd
 
 def currency_pair(request):
+    print(request.body)
     if request.method == 'POST':
         try:
             # 获取前端发送的 JSON 数据
@@ -214,10 +247,22 @@ def currency_pair(request):
             print(country_1)
             country_2 = countries[1]
             print(country_2)
-            deal_year = ''+data.get('investmentPeriod')+'年'
+            deal_year = data.get('investmentPeriod')
+            if deal_year == 1:
+                deal_year = '1年'
+            elif deal_year == 3:
+                deal_year = '3年'
+            elif deal_year == 5:
+                deal_year = '5年'
             print(deal_year)
-            date_start = data.get('startDate')
-            date_end = data.get('endDate')
+            date_start = datetime.strptime(data.get('startDate'), "%Y-%m-%d")
+            date_start = date_start.strftime("%Y-%m-%d")
+            # date_start = pd.to_datetime(data.get('startDate'))
+            print(date_start)
+            date_end = datetime.strptime(data.get('endDate'), "%Y-%m-%d")
+            date_end = date_end.strftime("%Y-%m-%d")
+            # date_end = pd.to_datetime(data.get('endDate'))
+            print(date_end)
             eurozone_countries = [
                 "Austria", "Belgium", "Croatia", "Cyprus", "Estonia", "Finland", "France",
                 "Germany", "Greece", "Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg",
@@ -230,19 +275,52 @@ def currency_pair(request):
                      country_1 = 'United_States'
                 if country_2 == 'United States' :
                      country_2 = 'United_States'
+                print('here1')
                 currency_1 = models.country_currency.objects.filter(country=country_1).first().currency
+                print(currency_1)
                 currency_2 = models.country_currency.objects.filter(country=country_2).first().currency
-                obj = models.date_currency_rates.objects.filter(currency_1=currency_1,currency_2=currency_2,date_time_gte=date_start,date_time_lte=date_end,deal_year=deal_year)
-                return JsonResponse({'status': 'correct', 
-                                     'message': '获取成功',
+                print(currency_2)
+                obj = models.date_currency_rates.objects.filter(
+                    currency_1=currency_1,
+                    currency_2=currency_2,
+                    date_time__gte=date_start,  # 大于等于 start datetime
+                    date_time__lte=date_end,     # 小于等于 end datetime
+                    deal_year=deal_year
+                )
+                # obj = pd.DataFrame(obj)
+                # obj = models.date_currency_rates.objects.filter(date_time__range=(date_start, date_end),currency_1=currency_1,currency_2=currency_2,deal_year=deal_year)
+                # print(obj.values_list('true_rate', flat=True))
+
+                date_time_list = list(obj.values_list('date_time', flat=True))
+                predict_rate_list = list(obj.values_list('predict_rate', flat=True))
+                true_rate_list = list(obj.values_list('true_rate', flat=True))
+                da = {
+                    'date_time': pd.to_datetime(date_time_list),
+                    'predict_rate': np.array(predict_rate_list, dtype=float),
+                    'true_rate': np.array(true_rate_list, dtype=float),
+                }
+                df = pd.DataFrame(da)
+                # print(df)
+                std_dev = df['predict_rate'].std()
+                print(std_dev)
+                percentiles = {0.25:0.0008, 0.50:0.0101, 0.75:0.1020, 0.90:1.5048}
+                volatility_rate = rate_volatility(std_dev, percentiles)
+                print(volatility_rate)
+                maxx = max_drawdown(df)
+                print(maxx)
+                return JsonResponse({'message': '获取成功',
                                      'data':{
-                                         'date_time':obj.values_list('date_time', flat=True),
-                                         'predict_rate':obj.values_list('predict_rate', flat=True),
-                                         'true_rate':obj.values_list('true_rate', flat=True)}})
-        except json.JSONDecodeError:
-            return JsonResponse({'status': 'error', 'message': '无效的 JSON 数据'}, status=400)
+                                         'date_time':date_time_list,
+                                         'predict_rate':predict_rate_list,
+                                         'true_rate':true_rate_list,
+                                         'volatility_rate':volatility_rate,
+                                         'max_drawdown':maxx,
+                                         }
+                                    },status=201)
+        # except json.JSONDecodeError:
+        #     return JsonResponse({'status': 'error', 'message': '无效的 JSON 数据'}, status=401)
         except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=501)
         
 def multi_currency(request):
      if request.method == 'POST':

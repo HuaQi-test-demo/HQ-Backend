@@ -46,8 +46,8 @@ class date_currency_rates(models.Model):
     date_time = models.DateField()
     currency_1 = models.CharField(max_length=100)
     currency_2 = models.CharField(max_length=100)
-    predict_rate = models.DecimalField(max_digits=10, decimal_places=6)
-    true_rate = models.DecimalField(max_digits=10, decimal_places=6)
+    predict_rate = models.DecimalField(max_digits=20, decimal_places=6)
+    true_rate = models.DecimalField(max_digits=20, decimal_places=6)
     deal_year = models.CharField(max_length=100)
 
 
