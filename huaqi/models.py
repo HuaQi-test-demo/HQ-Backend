@@ -42,7 +42,7 @@ class country_currency(models.Model):
     currency = models.CharField(max_length=100)
 
 
-class date_currency_rate(models.Model):
+class date_currency_rates(models.Model):
     date_time = models.DateField()
     currency_1 = models.CharField(max_length=100)
     currency_2 = models.CharField(max_length=100)
