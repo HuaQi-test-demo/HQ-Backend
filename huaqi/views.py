@@ -203,6 +203,36 @@ def submit_view(request):
             return JsonResponse({'status': 'error', 'message': '无效的 JSON 数据'}, status=400)
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+# 波动率评级函数
+def rate_volatility(std_dev, percentiles):
+    if std_dev < percentiles[0.25]:
+        return '低波动性'
+    elif std_dev < percentiles[0.5]:
+        return '较低波动性'
+    elif std_dev < percentiles[0.75]:
+        return '中等波动性'
+    elif std_dev < percentiles[0.90]:
+        return '较高波动性'
+    else:
+        return '高波动性'
+
+def max_drawdown(df):
+    """计算最大回撤"""
+    if df.empty:
+        print("!!!该时间段无数据")
+        return 0
+
+    # 记录最大回撤
+    mdd = 0  
+    peak = df['predict_rate'].iloc[0]  # 记录最高点（初始化为第一个值）
+
+    for price in df['predict_rate']:
+        if price > peak:
+            peak = price  # 更新最高点
+        drawdown = (price - peak) / peak  # 计算当前回撤
+        mdd = min(mdd, drawdown)  # 记录最大回撤
+
+    return mdd
 
 def currency_pair(request):
     print(request.body)
@@ -258,15 +288,32 @@ def currency_pair(request):
                 )
                 # obj = pd.DataFrame(obj)
                 # obj = models.date_currency_rates.objects.filter(date_time__range=(date_start, date_end),currency_1=currency_1,currency_2=currency_2,deal_year=deal_year)
-                print(obj.values_list('true_rate', flat=True))
+                # print(obj.values_list('true_rate', flat=True))
+
                 date_time_list = list(obj.values_list('date_time', flat=True))
                 predict_rate_list = list(obj.values_list('predict_rate', flat=True))
                 true_rate_list = list(obj.values_list('true_rate', flat=True))
+                da = {
+                    'date_time': pd.to_datetime(date_time_list),
+                    'predict_rate': np.array(predict_rate_list, dtype=float),
+                    'true_rate': np.array(true_rate_list, dtype=float),
+                }
+                df = pd.DataFrame(da)
+                # print(df)
+                std_dev = df['predict_rate'].std()
+                print(std_dev)
+                percentiles = {0.25:0.0008, 0.50:0.0101, 0.75:0.1020, 0.90:1.5048}
+                volatility_rate = rate_volatility(std_dev, percentiles)
+                print(volatility_rate)
+                maxx = max_drawdown(df)
+                print(maxx)
                 return JsonResponse({'message': '获取成功',
                                      'data':{
                                          'date_time':date_time_list,
                                          'predict_rate':predict_rate_list,
-                                         'true_rate':true_rate_list
+                                         'true_rate':true_rate_list,
+                                         'volatility_rate':volatility_rate,
+                                         'max_drawdown':maxx,
                                          }
                                     },status=201)
         # except json.JSONDecodeError:
