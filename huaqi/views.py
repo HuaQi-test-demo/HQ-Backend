@@ -540,37 +540,41 @@ def find_multi_currency(queryset,max_drawdown):
     #     result = {"nodes": "没东西", "edges": '没东西'}
     #
     return result
-def deepseek_generate(self,dates_begin,dates_end,currency_pair,countries,drawdown,maxdrawdown,identify):
+def deepseek_generate(dates_begin,dates_end,currency_pair,countries,drawdown,maxdrawdown,identify,flex_rate):
 
         # 从数据库中获取数据
-        data_dict = self.get_data_from_db(dates_begin,dates_end,currency_pair,countries,drawdown)
+        data_dict = get_data_from_db(dates_begin,dates_end,currency_pair,countries,drawdown)
 
         # 根据数据库中的数据组织一次提问
-        query = self.generate_query(currency_pair, data_dict,maxdrawdown,identify)
+        query = generate_query(currency_pair, data_dict,maxdrawdown,identify,flex_rate)
 
         # 使用大模型进行回答
-        response_ai = self.chat_completions(query)
+        response_ai = chat_completions(query)
         return JsonResponse({'response':response_ai})
-def get_data_from_db(self, dates_begin, dates_end, currency_pair,countries,drwadown):
+
+def get_data_from_db(dates_begin, dates_end, currency_pair,countries,drwadown):
     data_dict = {}
+    print(data_dict)
     try:
         data_dict['dates_begin']=dates_begin
         data_dict['dates_end']=dates_end
         data_dict['drawdown']=drwadown
-
+        print(data_dict)
         # 处理policy_2024表（汇率政策）
-        currency1, currency2 = currency_pair.split(',')
+        currency1, currency2 = currency_pair
+        print(currency1, currency2)
         policy_records = models.policy_2024.objects.filter(
             Date__range=[dates_begin, dates_end]
         ).filter(
             Q(affect_currency__contains=currency1) |
             Q(affect_currency__contains=currency2)
         )
-        data_dict['policy'] = [p.text_vectors for p in policy_records]
-
+        if policy_records is None:
+           print('没东西')
+        else:
+         data_dict['policy'] = [p.text_vectors for p in policy_records]
+         print(data_dict)
         # 处理news_2024表（地缘政治）
-        if isinstance(countries, str):
-            countries = countries.split(';')
         country_query = Q()
         for country in countries:
             country_query |= Q(Countries__contains=country.strip())
@@ -579,7 +583,7 @@ def get_data_from_db(self, dates_begin, dates_end, currency_pair,countries,drwad
             Date__range=[dates_begin, dates_end]
         ).filter(country_query)
         data_dict['news'] = [n.Content for n in news_records]
-
+        print(data_dict)
         # 处理basic_info_2024表（经济指标）
         basic_records = models.basic_info_2024.objects.filter(
             Date__range=[dates_begin, dates_end],
@@ -594,7 +598,7 @@ def get_data_from_db(self, dates_begin, dates_end, currency_pair,countries,drwad
             formatted_records.append(formatted)
 
         data_dict['basic_info'] = formatted_records
-
+        print(data_dict)
 
 
     except Exception as e:
@@ -612,7 +616,7 @@ def get_data_from_db(self, dates_begin, dates_end, currency_pair,countries,drwad
     return data_dict
 
 
-def generate_query(self, currency_pair, data_dict,maxdrawdown,identify):
+def generate_query( currency_pair, data_dict,maxdrawdown,identify,flex_rate):
         """
         根据数据库中的数据组织一次提问
         :param currency_pair: 货币对名称
@@ -624,6 +628,7 @@ def generate_query(self, currency_pair, data_dict,maxdrawdown,identify):
         预测风险结束时间:{}
         当前回撤:{}
         最大回撤:{}
+        汇率波动情况:{}
         各国经济指标:{}
         各国汇率政策:{}
         地缘政治因素:{}
@@ -637,6 +642,7 @@ def generate_query(self, currency_pair, data_dict,maxdrawdown,identify):
             data_dict.get("dates_end", "无相关数据"),
             data_dict.get("drawdown", "无相关数据"),
             maxdrawdown,
+            flex_rate,
             data_dict.get("policy", "无相关数据"),
             data_dict.get("news", "无相关数据"),
             data_dict.get("basic_info", "无相关数据"),
@@ -644,13 +650,13 @@ def generate_query(self, currency_pair, data_dict,maxdrawdown,identify):
         )
         return query
 
-def chat_completions(self, query):
+def chat_completions(query):
         """
         调用 OpenAI API 获取回答
         :param query: 提问内容
         :return: 大模型的回答
         """
-        client = OpenAI(api_key="<DeepSeek API Key>", base_url="https://api.deepseek.com")
+        client = OpenAI(api_key="sk-e6dca9c023dd455291b4946c5f89e171", base_url="https://api.deepseek.com")
 
 
         # 定义回答模板
@@ -667,61 +673,30 @@ def chat_completions(self, query):
         7.根据不同的身份信息给出具有针对性的报告
         8.给出的建议要切实有效
 
-        示例：
-        输出格式：
-       人民币兑美元（USD/CNY）汇率风险深度分析报告
-        一、波动周期分析
-             ·  当前回撤达{2.9}%，接近您设置的{3}%
-                风险窗口：{2024-7-1}至{2024-8-1}
-
-      二、驱动要素深度解析
-1. 经济基本面裂变
-  ·  通胀剪刀差加剧：美国核心CPI维持3.5%高位（住房项贡献58%），中国PPI连续11个月负增长（-1.4%），创2016年来最长通缩周期
-  ·  增长动能分化：美国Q2 GDP季调年率2.4% vs 中国6月制造业PMI 49.0（连续3月收缩）
-  ·  利率悬崖效应：中美10年期国债利差-215BP，倒挂幅度超2008金融危机峰值（-189BP），触发跨境套利资本日均流出5.2亿美元
-
-2. 政策多维博弈
-  ·  中国央行精准滴灌：
-     - MLF连续8周净投放5300亿（利率锚定2.5%）
-     - 启动离岸央票增发（500亿规模，期限63天）
-     - 窗口指导主要银行将结售汇点差压缩至25BP以内
-  ·  美联储双重紧缩：
-     - 资产负债表缩减950亿/月（MBS减持上限300亿）
-     - 逆回购池维持2.1万亿美元超额流动性
-     - 利率点阵图隐含2024年降息空间收窄至25BP
-  ·  监管科技升级：外汇局跨境金融区块链平台新增"热钱追踪"模块，实时监控1400余家机构外汇头寸
-
-3. 地缘冲击波传导
-  ·  贸易战2.0升级：
-     - 电动车关税7月生效（影响240亿美元贸易额）
-     - 半导体设备出口新规覆盖28nm以下制程
-     - 生物技术投资审查清单扩容至37个领域
-  ·  资本暗流涌动：
-     - 股票市场：EPFR监测显示47亿美元净流出（主动型基金占比73%）
-     - 债券市场：境外机构连续9月减持人民币债券（累计4820亿）
-     - 直接投资：Q2对华绿地投资同比下降39%（美国企业降幅达58%）
-  ·  货币武器化风险：SWIFT数据显示38个国家增加人民币结算占比，但美元仍主导83%能源交易
-
+示例：
+人民币兑美元（USD/CNY）汇率风险深度分析报告
+一、波动周期分析
+根据当前市场数据，人民币兑美元汇率波动率σ处于0.0101至0.1020之间，对应表5的波动性等级为“中”。这表明市场波动性已从较低水平上升至中等水平，预示着汇率风险正在积累。当前回撤已达2.9%，接近您设置的3%的预警线，表明在2024年7月1日至8月1日的风险窗口期内，汇率波动性可能进一步加剧。
+二、驱动要素深度解析
+1. 经济基本面（注意一定要包含cpi gdp pmi ppi cci unemployment六个维度）
+美国经济数据喜忧参半，一季度GDP增长2.0%，但通胀率仍高于2%目标，劳动力市场紧张状况有所缓解，但失业率仍处于历史低位。中国经济一季度GDP增长4.5%，消费和投资有所改善，但出口面临压力，贸易顺差收窄。
+2.政策多维博弈
+2024年7月12日至14日期间，中国央行与美联储的汇率政策形成鲜明博弈。7月12日，中国外汇交易中心将人民币中间价定为1美元兑7.1315元，当日央行通过增发300亿元离岸央票（含150亿元3个月期、100亿元6个月期），使香港离岸人民币隔夜拆借利率（HIBOR）骤升180个基点至5.8%，有效抑制做空压力，USD/CNH即期汇率稳定在7.15-7.18区间。同期美联储维持联邦基金利率5.5%高位，美债10年期收益率攀升至4.8%，吸引单周超120亿美元国际资本流入美元资产，推动美元指数突破105.5关口。政策对冲下，人民币汇率在7月14日收于7.1620，较政策实施前仅微贬0.3%，展现央地政策精准调控效力。
+3.地缘冲击波传导
+2024年6月15日至20日期间，全球地缘政治局势复杂多变，显著影响了汇率市场。6月15日，美国商务部将长江存储等12家中企列入实体清单，实施7纳米以下芯片设备禁运，涉及年贸易额58亿美元。禁令发布次日，离岸人民币对美元急贬0.8%，创2023年5月以来最大单日跌幅。台积电随后暂停南京厂扩产计划，导致半导体设备相关货币（新台币/韩元）波动率指数飙升42%。7月1日生效的《通胀削减法案》修订案，将中国产电动汽车电池组件补贴门槛提升至北美产能占比65%，并将光伏组件关税从25%提高至50%，影响年出口额240亿美元。新规公布后三个交易日，人民币对欧元累计贬值1.2%。6月20日，也门胡塞武装袭击红海油轮，导致布伦特原油突破90美元/桶，沙特里亚尔远期合约隐含波动率跳升28%，以色列新谢克尔对美元单周贬值3.7%，加元受益油价上涨对美元升值1.8%，但卢布受制裁升级拖累贬值4.2%。这些事件增加了市场的不确定性，引发汇率市场波动。
 三、分层应对策略
   [个人投资者]
   1. 购汇策略：采用"3-5-2"分批操作（7.25购30%、破7.20追50%、7.30保底20%）
   2. 持汇管理：美元现钞占比≤40%，推荐配置工行"双币宝"（保本收益率2.8%）
   3. 留学缴费：优先使用中行"优汇通"锁定6个月汇率（点差优惠15BP）
-
   [商业银行]
   1. 风险管控：设置三级预警（7.25黄色预警/7.28橙色预警/7.30红色预警）
   2. 产品设计：推出"鲨鱼鳍"结构性存款（执行价7.15-7.35，预期年化3.6-5.2%）
   3. 客户管理：企业客户保证金比例提升至110%（原100%），追加频率每日16:00前
-
   [跨国企业]
   1. 自然对冲：调整东南亚供应链账期至60天（原90天），匹配82%的应收应付
   2. 金融对冲：买入3个月期7.30看跌期权（权利金0.8%），覆盖65%敞口
   3. 结算优化：对欧贸易采用35%欧元+65%人民币结算，汇损降低0.4个百分点
-
-监测机制：
-·  每日跟踪CFETS人民币汇率指数、USDCNY 1M ATM波动率等12项指标
-·  当中间价连续3日偏离±1%时，启动跨境融资宏观审慎调节
-·  每周更新GARCH模型预测区间（95%置信水平：7.15-7.33）交易机会和风险控制。
         """
 
         # 将提问和回答模板一起发送给大模型
