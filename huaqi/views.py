@@ -313,7 +313,7 @@ def currency_pair(request):
                     is_risk = False
                 else:
                     is_risk = True
-                ai_result =  deepseek_generate(date_start,date_end,[currency_1,currency_2],[country_1,country_2],maxdd,maxDrawdown,'个人',std_dev)
+                # ai_result =  deepseek_generate(date_start,date_end,[currency_1,currency_2],[country_1,country_2],maxdd,maxDrawdown,'个人',std_dev)
                 return JsonResponse({'message': '获取成功',
                                      'data':{
                                          'date_time':date_time_list,
@@ -322,7 +322,7 @@ def currency_pair(request):
                                          'volatility_rate':volatility_rate,
                                          'max_drawdown':maxdd,
                                          'is_risk':is_risk,
-                                         'ai_result':ai_result
+                                        #  'ai_result':ai_result
                                          }
                                     },status=201)
         # except json.JSONDecodeError:
