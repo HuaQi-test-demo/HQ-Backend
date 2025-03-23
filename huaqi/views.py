@@ -346,7 +346,7 @@ def multi_currency(request):
             max_drawdown = data.get("maxDrawdown")
             dates = data.get('month')
             investment_period=data.get('investmentPeriod')
-            print(max_drawdown,dates)
+            print(max_drawdown,dates,investment_period)
             # dates='2024-08-01'
             # max_drawdown=-0.5
             # print(dates,max_drawdown)
