@@ -27,7 +27,10 @@ DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 
-
+CORS_ORIGIN_WHITELIST = [
+    'http://1.95.211.14',
+    'http://localhost:8848',
+]
 # Application definition
 
 INSTALLED_APPS = [
