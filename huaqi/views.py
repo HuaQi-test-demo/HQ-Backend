@@ -222,18 +222,49 @@ def max_drawdown(df):
     if df.empty:
         print("!!!该时间段无数据")
         return 0
+    # 定义原始列表
+    original_list = list(df['predict_rate'])
+    # 存储新列表
+    new_list = []
+    # 存储列表第一个值
+    current_value = original_list[0]
+    # 遍历原始列表
+    for value in original_list:
+        if value > current_value:
+            new_list.append(value)
+            current_value = value
+        else:
+            new_list.append(current_value)
+    new_list = np.array(new_list)
+    original_list = np.array(original_list)
+    res_list = list((new_list-original_list)/original_list*100)
+    # 定义原始列表
+    original_list2 = list(df['true_rate'])
+    # 存储新列表
+    new_list2 = []
+    # 存储列表第一个值
+    current_value2 = original_list2[0]
+    # 遍历原始列表
+    for value in original_list2:
+        if value > current_value2:
+            new_list2.append(value)
+            current_value2 = value
+        else:
+            new_list2.append(current_value2)
+    new_list2 = np.array(new_list2)
+    original_list2 = np.array(original_list2)
+    res_list2 = list((new_list2-original_list2)/original_list2*100)
+    return res_list,res_list2
+    # mdd = 0  
+    # peak = df['predict_rate'].iloc[0]  # 记录最高点（初始化为第一个值）
 
-    # 记录最大回撤
-    mdd = 0  
-    peak = df['predict_rate'].iloc[0]  # 记录最高点（初始化为第一个值）
+    # for price in df['predict_rate']:
+    #     if price > peak:
+    #         peak = price  # 更新最高点
+    #     drawdown = (price - peak) / peak  # 计算当前回撤
+    #     mdd = min(mdd, drawdown)  # 记录最大回撤
 
-    for price in df['predict_rate']:
-        if price > peak:
-            peak = price  # 更新最高点
-        drawdown = (price - peak) / peak  # 计算当前回撤
-        mdd = min(mdd, drawdown)  # 记录最大回撤
-
-    return mdd
+    # return mdd
 
 def currency_pair(request):
     print(request.body)
@@ -307,12 +338,12 @@ def currency_pair(request):
                 percentiles = {0.25:0.0008, 0.50:0.0101, 0.75:0.1020, 0.90:1.5048}
                 volatility_rate = rate_volatility(std_dev, percentiles)
                 print(volatility_rate)
-                maxdd = 0-max_drawdown(df)*100
-                print(maxdd)
-                if(maxDrawdown > maxdd):
-                    is_risk = False
-                else:
-                    is_risk = True
+                maxdd_p,maxdd_t = max_drawdown(df)
+                # print(maxdd)
+                # if(maxDrawdown > maxdd):
+                #     is_risk = False
+                # else:
+                #     is_risk = True
                 # ai_result =  deepseek_generate(date_start,date_end,[currency_1,currency_2],[country_1,country_2],maxdd,maxDrawdown,'个人',std_dev)
                 return JsonResponse({'message': '获取成功',
                                      'data':{
@@ -320,8 +351,9 @@ def currency_pair(request):
                                          'predict_rate':predict_rate_list,
                                          'true_rate':true_rate_list,
                                          'volatility_rate':volatility_rate,
-                                         'max_drawdown':maxdd,
-                                         'is_risk':is_risk,
+                                         'maxdd_predict':maxdd_p,
+                                         'maxdd_true':maxdd_t,
+                                        #  'is_risk':is_risk,
                                         #  'ai_result':ai_result
                                          }
                                     },status=201)
