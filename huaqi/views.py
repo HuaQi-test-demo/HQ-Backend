@@ -13,6 +13,14 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from huaqi import models
+import bleach
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_JUSTIFY
+import re
 # Create your views here.
 def login(request):
 
@@ -337,16 +345,30 @@ def multi_currency(request):
             data = json.loads(request.body)
             max_drawdown = data.get("maxDrawdown")
             dates = data.get('month')
+            investment_period=data.get('investmentPeriod')
             print(max_drawdown,dates)
             # dates='2024-08-01'
             # max_drawdown=-0.5
             # print(dates,max_drawdown)
             # 查询数据库中指定日期的记录
-            queryset_pre_5 = models.ProcessedPreDrawdown.objects.filter(Date=dates)
-            queryset_tar_5=models.ProcessedTarDrawdown.objects.filter(Date=dates)
-            result1=find_multi_currency(queryset_pre_5,max_drawdown)
-            result2=find_multi_currency(queryset_tar_5,max_drawdown)
-            return JsonResponse({'result1':result1,'result2':result2})
+            if investment_period==5:
+             queryset_pre_5 = models.ProcessedPreDrawdown.objects.filter(Date=dates)
+             queryset_tar_5=models.ProcessedTarDrawdown.objects.filter(Date=dates)
+             result1=find_multi_currency(queryset_pre_5,max_drawdown)
+             result2=find_multi_currency(queryset_tar_5,max_drawdown)
+             return JsonResponse({'result1':result1,'result2':result2})
+            if investment_period==3:
+                queryset_pre_3 = models.ProcessedPreDrawdown_3.objects.filter(Date=dates)
+                queryset_tar_3=models.ProcessedTarDrawdown_3.objects.filter(Date=dates)
+                result1=find_multi_currency(queryset_pre_3,max_drawdown)
+                result2=find_multi_currency(queryset_tar_3,max_drawdown)
+                return JsonResponse({'result1':result1,'result2':result2})
+            if investment_period==1:
+                queryset_pre_1 = models.ProcessedPreDrawdown_1.objects.filter(Date=dates)
+                queryset_tar_1 = models.ProcessedTarDrawdown_1.objects.filter(Date=dates)
+                result1=find_multi_currency(queryset_pre_1,max_drawdown)
+                result2=find_multi_currency(queryset_tar_1,max_drawdown)
+                return JsonResponse({'result1': result1, 'result2': result2})
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
      else:
@@ -610,21 +632,6 @@ def find_multi_currency(queryset,max_drawdown):
                             "size": ratio
                         })
         print(result)
-        #
-        #
-        # save_path = r'F:\GCN3.17\5_years\result.json'
-        #
-        #
-        # with open(save_path, 'w') as json_file:
-        #    json.dump(result, json_file, indent=4)
-
-        # print(f"JSON 文件已保存到：{save_path}")
-
-
-
-    # else:
-    #     result = {"nodes": "没东西", "edges": '没东西'}
-    #
     return result
 def deepseek_generate(dates_begin,dates_end,currency_pair,countries,drawdown,maxdrawdown,identify,flex_rate):
 
@@ -798,3 +805,169 @@ def chat_completions(query):
             return response.choices[0].message.content
         except TypeError:
             return "服务器发生错误，生成失败"
+
+
+# 字体配置（使用系统自带字体）
+FONT_CONFIG = {
+    'font_family': 'SimHei',  # 黑体字体
+    'default_font_size': 11,
+    'heading_font_size': 14,
+    'title_font_size': 18,
+    'list_bullet': '• ',
+    'list_indent': 15
+}
+
+# 样式配置
+STYLE_CONFIG = {
+    'paragraph': {
+        'line_height': 5,
+        'space_after': 3
+    },
+    'heading': {
+        'space_after': 10
+    },
+    'list': {
+        'line_height': 6
+    }
+}
+
+
+def init_pdf(response):
+    """初始化PDF对象并配置基础属性"""
+    doc = SimpleDocTemplate(response, pagesize=A4)
+    styles = getSampleStyleSheet()
+    doc.addFont('SimHei', 'SimHei', 'SimHei.ttf')
+    # 定义自定义样式
+    styles.add(
+        ParagraphStyle(name='TitleStyle', fontSize=FONT_CONFIG['title_font_size'], fontName=FONT_CONFIG['font_family'],
+                       leading=24))
+    styles.add(ParagraphStyle(name='HeadingStyle', fontSize=FONT_CONFIG['heading_font_size'],
+                              fontName=FONT_CONFIG['font_family'], leading=20))
+    styles.add(
+        ParagraphStyle(name='BodyStyle', fontSize=FONT_CONFIG['default_font_size'], fontName=FONT_CONFIG['font_family'],
+                       leading=18))
+    styles.add(ParagraphStyle(name='ListStyle', fontSize=FONT_CONFIG['default_font_size'] - 1,
+                              fontName=FONT_CONFIG['font_family'], leftIndent=FONT_CONFIG['list_indent']))
+
+    return doc, styles
+
+
+def process_line(line, current_paragraph, blank_line_count):
+    """处理单行文本并更新状态"""
+    line = line.strip()
+
+    # 处理空行
+    if not line:
+        blank_line_count[0] += 1
+        if blank_line_count[0] >= 2:
+            return True, 'paragraph', None  # 表示需要刷新段落
+        return False, None, None
+
+    blank_line_count[0] = 0
+
+    # 识别标题
+    if re.match(r'^#{1,3} ', line):
+        level = line.count('#')
+        header_text = re.sub(r'^#+\s*', '', line)
+        return True, 'heading', {'level': level, 'text': header_text}
+
+    # 识别列表项
+    if re.match(r'^(\*|•|→)\s', line):
+        text = re.sub(r'^(\*|•|→)\s*', '', line)
+        return True, 'list', {'text': text}
+
+    # 普通文本（累积段落）
+    current_paragraph.append(line)
+    return False, None, None
+
+
+def auto_render(doc, styles, text):
+    """自动渲染文本内容"""
+    content = []
+    current_paragraph = []
+    blank_line_count = [0]  # 使用可变对象来保持状态
+
+    for line in text.split('\n'):
+        need_flush, element_type, element_data = process_line(line, current_paragraph, blank_line_count)
+
+        if need_flush:
+            if element_type == 'paragraph':
+                if current_paragraph:
+                    text = ' '.join(current_paragraph)
+                    content.append(Paragraph(text, styles['BodyStyle']))
+                    content.append(Spacer(1, STYLE_CONFIG['paragraph']['space_after']))
+                    current_paragraph = []
+            elif element_type == 'heading':
+                header_style = ParagraphStyle(
+                    'HeadingStyle',
+                    fontSize=FONT_CONFIG['heading_font_size'] - 2 * element_data['level'],
+                    fontName=FONT_CONFIG['font_family'],
+                    leading=20 - 2 * element_data['level']
+                )
+                content.append(Paragraph(element_data['text'], header_style))
+                content.append(Spacer(1, STYLE_CONFIG['heading']['space_after']))
+            elif element_type == 'list':
+                list_style = ParagraphStyle(
+                    'ListStyle',
+                    leftIndent=FONT_CONFIG['list_indent'],
+                    fontName=FONT_CONFIG['font_family'],
+                    fontSize=FONT_CONFIG['default_font_size'] - 1
+                )
+                content.append(Paragraph(FONT_CONFIG['list_bullet'] + element_data['text'], list_style))
+                content.append(Spacer(1, STYLE_CONFIG['list']['line_height']))
+            else:
+                if current_paragraph:
+                    text = ' '.join(current_paragraph)
+                    content.append(Paragraph(text, styles['BodyStyle']))
+                    content.append(Spacer(1, STYLE_CONFIG['paragraph']['space_after']))
+                    current_paragraph = []
+
+    # 输出最后未处理的段落
+    if current_paragraph:
+        text = ' '.join(current_paragraph)
+        content.append(Paragraph(text, styles['BodyStyle']))
+
+    return content
+
+
+def generate_smart_pdf(request):
+   if request.method=='GET':
+    raw_text = """
+    人民币兑美元（USD/CNY）汇率分析报告
+
+    # 核心数据
+
+    当前汇率：7.18\n\n
+    波动范围：7.15-7.25\n\n\n
+
+    主要特征：
+    • 日均波动率0.68%\n
+    → 年化波动率12.5%\n
+    ※ 最大回撤2.9%\n\n\n
+
+    ## 风险预警
+    重点关注以下指标：\n\n
+    1. 离岸在岸价差\n
+    2. 期权隐含波动率\n\n\n
+    3. 外汇占款变动
+    """
+
+    # 创建一个HTTP响应，内容类型为PDF
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="smart_report.pdf"'
+
+    # 初始化PDF和样式
+    doc, styles = init_pdf(response)
+    print('doc' + str(doc), styles)
+    # 添加标题
+    title = Paragraph("人民币兑美元（USD/CNY）汇率风险深度分析报告", styles['TitleStyle'])
+    print('title')
+    content = [title, Spacer(1, 0.5 * inch)]
+    print(content)
+    # 渲染内容
+    content += auto_render(doc, styles, raw_text)
+    print(content)
+    # 构建PDF
+    doc.build(content)
+
+    return response
