@@ -1,14 +1,11 @@
 import json
-import string
-from dbm import error
 import secrets
-from os import access
-import openai
-from django.db.models.expressions import result
+from django.db.models import Q
 from django.http import JsonResponse
-from django.shortcuts import render,HttpResponse,redirect
 from openai import OpenAI
-
+import pandas as pd
+import numpy as np
+from datetime import datetime
 from huaqi import models
 # Create your views here.
 def login(request):
@@ -201,53 +198,179 @@ def submit_view(request):
             return JsonResponse({'status': 'error', 'message': '无效的 JSON 数据'}, status=400)
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+def rate_volatility(std_dev, percentiles):
+    if std_dev < percentiles[0.25]:
+        return '低波动性'
+    elif std_dev < percentiles[0.5]:
+        return '较低波动性'
+    elif std_dev < percentiles[0.75]:
+        return '中等波动性'
+    elif std_dev < percentiles[0.90]:
+        return '较高波动性'
+    else:
+        return '高波动性'
+def max_drawdown(df):
+    """计算最大回撤"""
+    if df.empty:
+        print("!!!该时间段无数据")
+        return 0
+    # 定义原始列表
+    original_list = list(df['predict_rate'])
+    # 存储新列表
+    new_list = []
+    # 存储列表第一个值
+    current_value = original_list[0]
+    # 遍历原始列表
+    for value in original_list:
+        if value > current_value:
+            new_list.append(value)
+            current_value = value
+        else:
+            new_list.append(current_value)
+    new_list = np.array(new_list)
+    original_list = np.array(original_list)
+    res_list = list((new_list-original_list)/original_list*100)
+    # 定义原始列表
+    original_list2 = list(df['true_rate'])
+    # 存储新列表
+    new_list2 = []
+    # 存储列表第一个值
+    current_value2 = original_list2[0]
+    # 遍历原始列表
+    for value in original_list2:
+        if value > current_value2:
+            new_list2.append(value)
+            current_value2 = value
+        else:
+            new_list2.append(current_value2)
+    new_list2 = np.array(new_list2)
+    original_list2 = np.array(original_list2)
+    res_list2 = list((new_list2-original_list2)/original_list2*100)
+    return res_list,res_list2
 
-def select_twe_countries(request):
+
+def currency_pair(request):
+    print(request.body)
     if request.method == 'POST':
         try:
             # 获取前端发送的 JSON 数据
             data = json.loads(request.body)
-            country_1 = data.get('country_1')
-            country_2 = data.get('country_2')
-            date_start = data.get('date_start')
-            date_end = data.get('date_end')
+            countries = data.get('countries')
+            print(countries)
+            country_1 = countries[0]
+            print(country_1)
+            country_2 = countries[1]
+            print(country_2)
+            deal_year = data.get('investmentPeriod')
+            if deal_year == 1:
+                deal_year = '1年'
+            elif deal_year == 3:
+                deal_year = '3年'
+            elif deal_year == 5:
+                deal_year = '5年'
+            print(deal_year)
+            date_start = datetime.strptime(data.get('startDate'), "%Y-%m-%d")
+            date_start = date_start.strftime("%Y-%m-%d")
+            print(date_start)
+            date_end = datetime.strptime(data.get('endDate'), "%Y-%m-%d")
+            date_end = date_end.strftime("%Y-%m-%d")
+            print(date_end)
+            maxDrawdown = data.get('maxDrawdown')
             eurozone_countries = [
                 "Austria", "Belgium", "Croatia", "Cyprus", "Estonia", "Finland", "France",
                 "Germany", "Greece", "Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg",
                 "Malta", "Netherlands", "Portugal", "Slovakia", "Slovenia", "Spain"
             ]
-            if country_1  in eurozone_countries and country_2 in eurozone_countries:
+            if country_1 in eurozone_countries and country_2 in eurozone_countries:
                 return JsonResponse({'status': 'error', 'message': '两个欧元国家'})
             else:
+                if country_1 == 'United States':
+                    country_1 = 'United_States'
+                if country_2 == 'United States':
+                    country_2 = 'United_States'
+                print('here1')
                 currency_1 = models.country_currency.objects.filter(country=country_1).first().currency
+                print(currency_1)
                 currency_2 = models.country_currency.objects.filter(country=country_2).first().currency
-                obj = models.date_currency_rate.objects.filter(currency_1=currency_1,currency_2=currency_2,date_gte=date_start,date_lte=date_end)
-                return JsonResponse({'status': 'correct', 'message': '获取成功','data':{'dates':obj.values_list('date', flat=True),'rates':obj.values_list('rate', flat=True)}})
-              
-        except json.JSONDecodeError:
-            return JsonResponse({'status': 'error', 'message': '无效的 JSON 数据'}, status=400)
+                print(currency_2)
+                obj = models.date_currency_rates.objects.filter(
+                    currency_1=currency_1,
+                    currency_2=currency_2,
+                    date_time__gte=date_start,
+                    # 大于等于 start datetime
+                    date_time__lte=date_end,
+                    # 小于等于 end datetime
+                    deal_year=deal_year
+                )
+                date_time_list = list(obj.values_list('date_time', flat=True))
+                predict_rate_list = list(obj.values_list('predict_rate', flat=True))
+                true_rate_list = list(obj.values_list('true_rate', flat=True))
+                da = {
+                    'date_time': pd.to_datetime(date_time_list),
+                    'predict_rate': np.array(predict_rate_list, dtype=float),
+                    'true_rate': np.array(true_rate_list, dtype=float),
+                }
+                df = pd.DataFrame(da)
+                std_dev = df['predict_rate'].std()
+                print(std_dev)
+                percentiles = {0.25: 0.0008, 0.50: 0.0101, 0.75: 0.1020, 0.90: 1.5048}
+                volatility_rate = rate_volatility(std_dev, percentiles)
+                print(volatility_rate)
+                maxdd_p, maxdd_t = max_drawdown(df)
+                print('maxdd')
+                # identity_user=request.session.get('user_type')
+                # print(identity_user)
+                ai_result = deepseek_generate(date_start, date_end, [currency_1, currency_2], [country_1, country_2],
+                                              [maxdd_p, maxdd_t], maxDrawdown, '个人', std_dev)
+                return JsonResponse({'message': '获取成功',
+                                     'data': {
+                                         'date_time': date_time_list,
+                                         'predict_rate': predict_rate_list,
+                                         'true_rate': true_rate_list,
+                                         'volatility_rate': volatility_rate,
+                                         'maxdd_predict': maxdd_p,
+                                         'maxdd_true': maxdd_t,
+                                         'ai_result': ai_result
+                                     }
+                                     }, status=201)
         except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=501)
+
+
 def multi_currency(request):
-     if request.method == 'POST':
+    if request.method == 'POST':
         try:
             # 解析请求体中的 JSON 数据
             data = json.loads(request.body)
             max_drawdown = data.get("maxDrawdown")
             dates = data.get('month')
-            print(max_drawdown,dates)
+            investment_period = data.get('investmentPeriod')
+            print(max_drawdown, dates, investment_period)
             # dates='2024-08-01'
             # max_drawdown=-0.5
             # print(dates,max_drawdown)
             # 查询数据库中指定日期的记录
-            queryset_pre_5 = models.ProcessedPreDrawdown.objects.filter(Date=dates)
-            queryset_tar_5=models.ProcessedTarDrawdown.objects.filter(Date=dates)
-            result1=find_multi_currency(queryset_pre_5,max_drawdown)
-            result2=find_multi_currency(queryset_tar_5,max_drawdown)
-            return JsonResponse({'result1':result1,'result2':result2})
+            if investment_period == 5:
+                queryset_pre_5 = models.ProcessedPreDrawdown.objects.filter(Date=dates)
+                queryset_tar_5 = models.ProcessedTarDrawdown.objects.filter(Date=dates)
+                result1 = find_multi_currency(queryset_pre_5, max_drawdown)
+                result2 = find_multi_currency(queryset_tar_5, max_drawdown)
+                return JsonResponse({'result1': result1, 'result2': result2})
+            if investment_period == 3:
+                queryset_pre_3 = models.ProcessedPreDrawdown_3.objects.filter(Date=dates)
+                queryset_tar_3 = models.ProcessedTarDrawdown_3.objects.filter(Date=dates)
+                result1 = find_multi_currency(queryset_pre_3, max_drawdown)
+                result2 = find_multi_currency(queryset_tar_3, max_drawdown)
+                return JsonResponse({'result1': result1, 'result2': result2})
+            if investment_period == 1:
+                queryset_pre_1 = models.ProcessedPreDrawdown_1.objects.filter(Date=dates)
+                queryset_tar_1 = models.ProcessedTarDrawdown_1.objects.filter(Date=dates)
+                result1 = find_multi_currency(queryset_pre_1, max_drawdown)
+                result2 = find_multi_currency(queryset_tar_1, max_drawdown)
+                return JsonResponse({'result1': result1, 'result2': result2})
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
-     else:
+    else:
         return JsonResponse({"error": "Invalid request method"}, status=405)
 def find_multi_currency(queryset,max_drawdown):
     if queryset is not None:
@@ -524,91 +647,177 @@ def find_multi_currency(queryset,max_drawdown):
     #     result = {"nodes": "没东西", "edges": '没东西'}
     #
     return result
-def deepseek_generate(self,dates_begin,dates_end,currency_pair):
-        table_names = [
-            'max_drawdown_table',  # 最大回撤关系表
-            'exchange_rate_volatility_table',  # 汇率波动情况表
-            'exchange_rate_policies_table',  # 各国汇率政策表
-            'geopolitical_factors_table'  # 地缘政治因素表
-        ]
 
-        # 从数据库中获取数据
-        data_dict = self.get_data_from_db(table_names,dates_begin,dates_end,currency_pair)
 
-        # 根据数据库中的数据组织一次提问
-        query = self.generate_query(currency_pair, data_dict)
+def deepseek_generate(dates_begin, dates_end, currency_pair, countries, drawdown, maxdrawdown, identify, flex_rate):
+    # 从数据库中获取数据
+    data_dict = get_data_from_db(dates_begin, dates_end, currency_pair, countries, drawdown)
 
-        # 使用大模型进行回答
-        response_ai = self.chat_completions(query)
-        return JsonResponse({'response':response_ai})
-def get_data_from_db(self, table_names, dates_begin, dates_end, currency_pair):
+    # 根据数据库中的数据组织一次提问
+    query = generate_query(currency_pair, data_dict, maxdrawdown, identify, flex_rate)
+
+    # 使用大模型进行回答
+    response_ai = chat_completions(query)
+    return response_ai
+
+
+def get_data_from_db(dates_begin, dates_end, currency_pair, countries, drwadown):
     data_dict = {}
+    print(data_dict)
+    try:
+        data_dict['dates_begin'] = dates_begin
+        data_dict['dates_end'] = dates_end
+        data_dict['drawdown'] = drwadown
+        print(data_dict)
+        # 处理policy_2024表（汇率政策）
+        currency1, currency2 = currency_pair
+        print(currency1, currency2)
+        policy_records = models.policy_2024.objects.filter(
+            Date__range=[dates_begin, dates_end]
+        ).filter(
+            Q(affect_currency__contains=currency1) |
+            Q(affect_currency__contains=currency2)
+        )
+        if policy_records is None:
+            print('没东西')
+        else:
+            data_dict['policy'] = [p.text_vectors for p in policy_records]
+            print(data_dict)
+            # 处理news_2024表（地缘政治）
+        country_query = Q()
+        for country in countries:
+            country_query |= Q(Countries__contains=country.strip())
+
+        news_records = models.news_2024.objects.filter(
+            Date__range=[dates_begin, dates_end]
+        ).filter(country_query)
+        data_dict['news'] = [n.Content for n in news_records]
+        print(data_dict)
+        # 处理basic_info_2024表（经济指标）
+        basic_records = models.basic_info_2024.objects.filter(
+            Date__range=[dates_begin, dates_end],
+            currency__in=[currency1, currency2]
+        ).values('cpi', 'gdp', 'pmi', 'ppi', 'cci', 'unemployment')
+
+        # 将QuerySet转换为字典列表，并处理字段类型
+        formatted_records = []
+        for record in basic_records:
+            formatted = {k: float(v) if v.replace('.', '', 1).isdigit() else v
+                         for k, v in record.items()}
+            formatted_records.append(formatted)
+
+        data_dict['basic_info'] = formatted_records
+        print(data_dict)
+
+
+    except Exception as e:
+        print(f"Database query error: {str(e)}")
+        return {
+            'dates_begin': [],
+            'dates_end': [],
+            'drawdown': [],
+
+            'policy': [],
+            'news': [],
+            'basic_info': []
+        }
+
     return data_dict
 
-def generate_query(self, currency_pair, data_dict):
+def generate_query(currency_pair, data_dict, maxdrawdown, identify, flex_rate):
         """
         根据数据库中的数据组织一次提问
         :param currency_pair: 货币对名称
         :param data_dict: 包含从数据库中获取的数据的字典
         :return: 按照模板格式生成的提问
         """
-        template = """该货币对名称:{}
-        和最大回撤关系:{}
-        汇率波动情况:{}
-        各国汇率政策:{}
-        地缘政治因素:{}"""
+        template = """该货币对名称:{}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+        预测风险开始时间:{}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
+        预测风险结束时间:{}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
+        当前回撤:{}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+        最大回撤:{}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+        汇率波动情况:{}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+        各国经济指标:{}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+        各国汇率政策:{}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+        地缘政治因素:{}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+        身份信息:{}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+        """
 
         # 按照模板格式生成提问
         query = template.format(
             currency_pair,
-            data_dict.get("max_drawdown_table", "无相关数据"),
-            data_dict.get("exchange_rate_volatility_table", "无相关数据"),
-            data_dict.get("exchange_rate_policies_table", "无相关数据"),
-            data_dict.get("geopolitical_factors_table", "无相关数据")
+            data_dict.get("dates_begin", "无相关数据"),
+            data_dict.get("dates_end", "无相关数据"),
+            data_dict.get("drawdown", "无相关数据"),
+            maxdrawdown,
+            flex_rate,
+            data_dict.get("policy", "无相关数据"),
+            data_dict.get("news", "无相关数据"),
+            data_dict.get("basic_info", "无相关数据"),
+            identify
         )
         return query
 
-def chat_completions(self, query):
+
+def chat_completions(query):
+    """
+    调用 OpenAI API 获取回答
+    :param query: 提问内容
+    :return: 大模型的回答
+    """
+    client = OpenAI(api_key="sk-e6dca9c023dd455291b4946c5f89e171", base_url="https://api.deepseek.com")
+
+    # 定义回答模板
+    response_template = """                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+        根据以上信息和该货币对在网络上的公开信息，你的任务是从专业的角度分点简要总结该货币对的汇率风险信号，并且注意根据身份信息生成针对不同人群的风险报告。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+
+        要求如下：                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+        1.不允许在答案中添加编造成分；                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+        2.引用行业相关术语，突显专业性；                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+        3.答案请使用中文，字数在700字以内；                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
+        4.将你的回答分点列出，确保逻辑清晰；                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+        5.使用段落结构，输出的每段文字的首行缩进2个中文字符，段落之间无空行，保持格式整洁美观；                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+        6.输出格式请严格参照示例的输出格式。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+        7.根据不同的身份信息给出具有针对性的报告                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+        8.给出的建议要切实有效                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+
+示例：                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
+人民币兑美元（USD/CNY）汇率风险深度分析报告                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+一、波动周期分析                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+根据当前市场数据，人民币兑美元汇率波动率σ处于0.0101至0.1020之间，对应表5的波动性等级为“中”。这表明市场波动性已从较低水平上升至中等水平，预示着汇率风险正在积累。当前回撤已达2.9%，接近您设置的3%的预警线，表明在2024年7月1日至8月1日的风险窗口期内，汇率波动性可能进一步加剧。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+二、驱动要素深度解析                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+1. 经济基本面（注意一定要包含cpi gdp pmi ppi cci unemployment六个维度）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+美国经济数据喜忧参半，一季度GDP增长2.0%，但通胀率仍高于2%目标，劳动力市场紧张状况有所缓解，但失业率仍处于历史低位。中国经济一季度GDP增长4.5%，消费和投资有所改善，但出口面临压力，贸易顺差收窄。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+2.政策多维博弈                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+2024年7月12日至14日期间，中国央行与美联储的汇率政策形成鲜明博弈。7月12日，中国外汇交易中心将人民币中间价定为1美元兑7.1315元，当日央行通过增发300亿元离岸央票（含150亿元3个月期、100亿元6个月期），使香港离岸人民币隔夜拆借利率（HIBOR）骤升180个基点至5.8%，有效抑制做空压力，USD/CNH即期汇率稳定在7.15-7.18区间。同期美联储维持联邦基金利率5.5%高位，美债10年期收益率攀升至4.8%，吸引单周超120亿美元国际资本流入美元资产，推动美元指数突破105.5关口。政策对冲下，人民币汇率在7月14日收于7.1620，较政策实施前仅微贬0.3%，展现央地政策精准调控效力。                                                                                                                                                                                                                                                                                                                                                    
+3.地缘冲击波传导                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+2024年6月15日至20日期间，全球地缘政治局势复杂多变，显著影响了汇率市场。6月15日，美国商务部将长江存储等12家中企列入实体清单，实施7纳米以下芯片设备禁运，涉及年贸易额58亿美元。禁令发布次日，离岸人民币对美元急贬0.8%，创2023年5月以来最大单日跌幅。台积电随后暂停南京厂扩产计划，导致半导体设备相关货币（新台币/韩元）波动率指数飙升42%。7月1日生效的《通胀削减法案》修订案，将中国产电动汽车电池组件补贴门槛提升至北美产能占比65%，并将光伏组件关税从25%提高至50%，影响年出口额240亿美元。新规公布后三个交易日，人民币对欧元累计贬值1.2%。6月20日，也门胡塞武装袭击红海油轮，导致布伦特原油突破90美元/桶，沙特里亚尔远期合约隐含波动率跳升28%，以色列新谢克尔对美元单周贬值3.7%，加元受益油价上涨对美元升值1.8%，但卢布受制裁升级拖累贬值4.2%。这些事件增加了市场的不确定性，引发汇率市场波动。                                                                                                                                                                                                                                        
+三、分层应对策略                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+  [个人投资者]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+  1. 购汇策略：采用"3-5-2"分批操作（7.25购30%、破7.20追50%、7.30保底20%）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+  2. 持汇管理：美元现钞占比≤40%，推荐配置工行"双币宝"（保本收益率2.8%）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+  3. 留学缴费：优先使用中行"优汇通"锁定6个月汇率（点差优惠15BP）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+  [商业银行]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+  1. 风险管控：设置三级预警（7.25黄色预警/7.28橙色预警/7.30红色预警）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
+  2. 产品设计：推出"鲨鱼鳍"结构性存款（执行价7.15-7.35，预期年化3.6-5.2%）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+  3. 客户管理：企业客户保证金比例提升至110%（原100%），追加频率每日16:00前                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+  [跨国企业]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+  1. 自然对冲：调整东南亚供应链账期至60天（原90天），匹配82%的应收应付                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+  2. 金融对冲：买入3个月期7.30看跌期权（权利金0.8%），覆盖65%敞口                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+  3. 结算优化：对欧贸易采用35%欧元+65%人民币结算，汇损降低0.4个百分点                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
         """
-        调用 OpenAI API 获取回答
-        :param query: 提问内容
-        :return: 大模型的回答
-        """
-        client = OpenAI(api_key="<DeepSeek API Key>", base_url="https://api.deepseek.com")
 
+    # 将提问和回答模板一起发送给大模型
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[
+            {"role": "system", "content": "You are a helpful master of the foreign exchange market."},
+            {"role": "user", "content": query + response_template}
+        ]
+    )
 
-        # 定义回答模板
-        response_template = """
-        根据以上信息和该货币对在网络上的公开信息，你的任务是从专业的角度分点简要总结该货币对的汇率风险信号，只需得出结论即可。
+    try:
+        return response.choices[0].message.content
+    except TypeError:
+        return "服务器发生错误，生成失败"
 
-        要求如下：
-        1.不允许在答案中添加编造成分；
-        2.引用行业相关术语，突显专业性；
-        3.答案请使用中文，字数在350字以内；
-        4.将你的回答分点列出，确保逻辑清晰；
-        5.使用段落结构，输出的每段文字的首行缩进2个中文字符，段落之间无空行，保持格式整洁美观；
-        6.输出格式请严格参照示例的输出格式。
-
-        示例：
-        输出格式：
-        1. 人民币兑美元汇率近期波动加剧，从7.17附近波动至7.26附近，短期内波动幅度超过1%。市场交投情绪谨慎，日均波动幅度扩大至0.5%-1.0%。
-        2. 和最大回撤关系显示，近期人民币汇率的波动导致投资者面临较大的回撤风险，特别是在市场情绪波动较大的时段。
-        3. 汇率波动情况方面，人民币兑美元汇率在亚洲时段和美国时段波动较为明显，受经济数据公布和央行官员讲话影响较大。技术指标上，MACD出现死叉，RSI指标处于超卖状态。
-        4. 各国汇率政策对汇率影响显著，中国央行通过发行央行票据收紧离岸市场流动性，稳定人民币汇率。美国方面，美联储的货币政策调整也对汇率产生了间接影响。
-        5. 地缘政治因素增加了市场的不确定性，例如美国新政府的贸易政策动向，这是当前牵动美元指数及特定经济体货币汇率的一个关键因素。
-        6. 综合来看，人民币兑美元汇率市场目前处于波动风险加剧的状态，多空力量在关键点位附近博弈。投资者需密切关注央行的货币政策动态以及宏观经济数据发布，以把握潜在的交易机会和风险控制。
-        """
-
-        # 将提问和回答模板一起发送给大模型
-        response = client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[
-                {"role": "system", "content": "You are a helpful master of the foreign exchange market."},
-                {"role": "user", "content": query + response_template}
-            ]
-        )
-
-        try:
-            return response.choices[0].message.content
-        except TypeError:
-            return "服务器发生错误，生成失败"

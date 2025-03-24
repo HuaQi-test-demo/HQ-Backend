@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("huaqi", "0004_country_currency_date_currency_rate_and_more"),
+        ("huaqi", "0004_country_currency_date_currency_rates_and_more"),
     ]
 
     operations = [

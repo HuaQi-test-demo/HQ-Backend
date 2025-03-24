@@ -26,5 +26,6 @@ urlpatterns = [
     path('register/',views.register),
     # path('table/',views.table),
     path('submit/',views.submit_view),
-    path('multi_currency/',views.multi_currency)
+    path('multi_currency/',views.multi_currency),
+    path('currency_pair',views.currency_pair)
 ]
