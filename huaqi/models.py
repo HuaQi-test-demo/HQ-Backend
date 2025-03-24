@@ -1724,3 +1724,8 @@ class news_2024(models.Model):
     Date = models.DateField()
     Content=models.TextField()
     Countries=models.TextField()
+class policy_2024(models.Model):
+    Date = models.DateField()
+    affect_currency=models.CharField(max_length=500)
+    affect_country=models.CharField(max_length=500)
+    text_vectors=models.TextField()
