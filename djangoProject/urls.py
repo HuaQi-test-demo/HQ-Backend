@@ -22,12 +22,12 @@ from huaqi import views
 from django.conf import settings
 urlpatterns = [
     #    path("admin/", admin.site.urls),
-    path('login1/', views.login),
-    path('register1/',views.register),
+    path('login/', views.login),
+    path('register/',views.register),
     # path('table/',views.table),
-    path('submit1/',views.submit_view),
-    path('multi_currency1/',views.multi_currency),
-    path('currency_pair1/',views.currency_pair),
-    path('generate_pdf1/',views.generate_smart_pdf),
+    path('submit/',views.submit_view),
+    path('multi_currency/',views.multi_currency),
+    path('currency_pair/',views.currency_pair),
+    path('generate_pdf/',views.generate_smart_pdf),
 
 ]

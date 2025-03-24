@@ -31,7 +31,6 @@ def login(request):
         print(username,password)
         access_token=secrets.token_hex(32)
         obj_user=models.userInfo.objects.filter(name=username,password=password).first()
-        # obj_user = ["k"]
         if obj_user is not None :
         #   print(obj_user.account_name)
          #request.session['account_name'] = obj.account_name
@@ -86,31 +85,6 @@ def register(request):
         else:
          models.userInfo.objects.create(name=username,password=password,user_type=user_type,email=email)
          return JsonResponse({'status': 'ok', 'message': '注册成功'})
-        
-    # if request.method == "GET":
-    #     return render(request, 'register.html')
-    # else:
-    #     new_username = request.POST['username']
-    #     new_password = request.POST['password']
-    #     new_confirmpassword = request.POST['confirm-password']
-    #     new_user_type = request.POST['user_type']
-    #     new_email = request.POST['email']
-    #     new_account_name = request.POST['account_name']
-    #     if new_password != new_confirmpassword:
-    #         return render(request,'register.html',{"error":"两次密码不一致，请重新设置密码"})
-    #     elif models.userInfo.objects.filter(name=new_username).exists():
-    #         return render(request,'register.html',{"error":"账号已存在，请换一个"})
-    #     else:
-    #      models.userInfo.objects.create(name=new_username,password=new_password,user_type=new_user_type,email=new_email,account_name=new_account_name)
-    #      return redirect('/login/')
-
-# def table(request):
-#     table_account_name=request.session['account_name']
-#     if table_account_name is not None :
-#       print(table_account_name)
-#       return render(request,'table.html',{'table_account_name':table_account_name})
-#     else:
-#         return render(request,'login.html')
 
 def submit_view(request):
     #if request.method == "GET":
