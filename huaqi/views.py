@@ -305,7 +305,21 @@ def currency_pair(request):
                 print(volatility_rate)
                 maxdd_p,maxdd_t = max_drawdown(df)
                 print('maxdd')
-                ai_result =  deepseek_generate(date_start,date_end,[currency_1,currency_2],[country_1,country_2],[maxdd_p,maxdd_t],maxDrawdown,'个人',std_dev)
+                temp = False
+                for value in maxdd_p:
+                    if value >= maxDrawdown:
+                        temp = True
+                        break
+                print(maxDrawdown)
+                temp2 = False
+                for value in maxdd_t:
+                    if value >= maxDrawdown:
+                        temp2 = True
+                        break
+                if temp or temp2:
+                    ai_result =  deepseek_generate(date_start,date_end,[currency_1,currency_2],[country_1,country_2],[maxdd_p,maxdd_t],maxDrawdown,'个人',std_dev)
+                else:
+                    ai_result = '无风险'
                 return JsonResponse({'message': '获取成功',
                                      'data':{
                                          'date_time':date_time_list,
