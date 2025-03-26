@@ -28,5 +28,9 @@ urlpatterns = [
     path('submit/',views.submit_view),
     path('multi_currency/',views.multi_currency),
     path('currency_pair/',views.currency_pair),
+<<<<<<< HEAD
+=======
+    path('generate_pdf/',views.generate_smart_pdf),
+>>>>>>> d4603f52481ff831a4bc9d374bf39bb1e64d29b7
 
 ]
