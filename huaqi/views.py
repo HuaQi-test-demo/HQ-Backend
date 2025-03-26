@@ -1,11 +1,6 @@
 import json
-import string
-from dbm import error
 import secrets
-from os import access
-import openai
 from django.db.models import Q
-from django.db.models.expressions import result
 from django.http import JsonResponse
 from django.shortcuts import render,HttpResponse,redirect
 from openai import OpenAI
@@ -13,30 +8,27 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from huaqi import models
-import bleach
-from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_JUSTIFY
 import re
 # Create your views here.
 def login(request):
-
+    global global_user_type
     if request.method == "POST":
         data = json.loads(request.body)
         username = data.get('username')
         password =data.get('password')
         print(username,password)
+
         access_token=secrets.token_hex(32)
         obj_user=models.userInfo.objects.filter(name=username,password=password).first()
         # obj_user = ["k"]
         if obj_user is not None :
         #   print(obj_user.account_name)
-         #request.session['account_name'] = obj.account_name
-            #print(obj.account_name)
-            # redirect('/submit/')
+        #   request.session['user_type'] = obj_user.user_type
+          global_user_type={'user_type':obj_user.user_type}
           return JsonResponse({
              'success': True,
              'message': '登录成功',
@@ -71,6 +63,7 @@ def login(request):
 
 def register(request):
     if request.method == "POST":
+        global global_user_data
         data = json.loads(request.body)
         username = data.get('username')
         password =data.get('password')
@@ -78,7 +71,9 @@ def register(request):
         user_type =data.get('category')
         email =data.get('email')
         print(username,password,confirm_password,email)
-
+        global_user_data = {
+            'user_type': user_type,
+        }
         if password != confirm_password:
             return JsonResponse({'status': 'error', 'message': '两次密码不一致，请重新设置密码'})
         elif models.userInfo.objects.filter(name=username).exists():
@@ -87,30 +82,9 @@ def register(request):
          models.userInfo.objects.create(name=username,password=password,user_type=user_type,email=email)
          return JsonResponse({'status': 'ok', 'message': '注册成功'})
         
-    # if request.method == "GET":
-    #     return render(request, 'register.html')
-    # else:
-    #     new_username = request.POST['username']
-    #     new_password = request.POST['password']
-    #     new_confirmpassword = request.POST['confirm-password']
-    #     new_user_type = request.POST['user_type']
-    #     new_email = request.POST['email']
-    #     new_account_name = request.POST['account_name']
-    #     if new_password != new_confirmpassword:
-    #         return render(request,'register.html',{"error":"两次密码不一致，请重新设置密码"})
-    #     elif models.userInfo.objects.filter(name=new_username).exists():
-    #         return render(request,'register.html',{"error":"账号已存在，请换一个"})
-    #     else:
-    #      models.userInfo.objects.create(name=new_username,password=new_password,user_type=new_user_type,email=new_email,account_name=new_account_name)
-    #      return redirect('/login/')
 
-# def table(request):
-#     table_account_name=request.session['account_name']
-#     if table_account_name is not None :
-#       print(table_account_name)
-#       return render(request,'table.html',{'table_account_name':table_account_name})
-#     else:
-#         return render(request,'login.html')
+
+
 
 def submit_view(request):
     #if request.method == "GET":
@@ -213,17 +187,18 @@ def submit_view(request):
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 # 波动率评级函数
+# 波动率评级函数
 def rate_volatility(std_dev, percentiles):
-    if std_dev < percentiles[0.25]:
-        return '低波动性'
-    elif std_dev < percentiles[0.5]:
-        return '较低波动性'
-    elif std_dev < percentiles[0.75]:
-        return '中等波动性'
-    elif std_dev < percentiles[0.90]:
-        return '较高波动性'
-    else:
-        return '高波动性'
+  if std_dev < percentiles[0.25]:
+    return '低波动性'
+  elif std_dev < percentiles[0.5]:
+    return '较低波动性'
+  elif std_dev < percentiles[0.75]:
+    return '中等波动性'
+  elif std_dev < percentiles[0.90]:
+    return '较高波动性'
+  else:
+    return '高波动性'
 
 def max_drawdown(df):
     """计算最大回撤"""
@@ -263,16 +238,7 @@ def max_drawdown(df):
     original_list2 = np.array(original_list2)
     res_list2 = list((new_list2-original_list2)/original_list2*100)
     return res_list,res_list2
-    # mdd = 0  
-    # peak = df['predict_rate'].iloc[0]  # 记录最高点（初始化为第一个值）
 
-    # for price in df['predict_rate']:
-    #     if price > peak:
-    #         peak = price  # 更新最高点
-    #     drawdown = (price - peak) / peak  # 计算当前回撤
-    #     mdd = min(mdd, drawdown)  # 记录最大回撤
-
-    # return mdd
 
 def currency_pair(request):
     print(request.body)
@@ -296,11 +262,9 @@ def currency_pair(request):
             print(deal_year)
             date_start = datetime.strptime(data.get('startDate'), "%Y-%m-%d")
             date_start = date_start.strftime("%Y-%m-%d")
-            # date_start = pd.to_datetime(data.get('startDate'))
             print(date_start)
             date_end = datetime.strptime(data.get('endDate'), "%Y-%m-%d")
             date_end = date_end.strftime("%Y-%m-%d")
-            # date_end = pd.to_datetime(data.get('endDate'))
             print(date_end)
             maxDrawdown = data.get('maxDrawdown')
             eurozone_countries = [
@@ -327,10 +291,6 @@ def currency_pair(request):
                     date_time__lte=date_end,     # 小于等于 end datetime
                     deal_year=deal_year
                 )
-                # obj = pd.DataFrame(obj)
-                # obj = models.date_currency_rates.objects.filter(date_time__range=(date_start, date_end),currency_1=currency_1,currency_2=currency_2,deal_year=deal_year)
-                # print(obj.values_list('true_rate', flat=True))
-
                 date_time_list = list(obj.values_list('date_time', flat=True))
                 predict_rate_list = list(obj.values_list('predict_rate', flat=True))
                 true_rate_list = list(obj.values_list('true_rate', flat=True))
@@ -340,19 +300,31 @@ def currency_pair(request):
                     'true_rate': np.array(true_rate_list, dtype=float),
                 }
                 df = pd.DataFrame(da)
-                # print(df)
                 std_dev = df['predict_rate'].std()
                 print(std_dev)
                 percentiles = {0.25:0.0008, 0.50:0.0101, 0.75:0.1020, 0.90:1.5048}
                 volatility_rate = rate_volatility(std_dev, percentiles)
                 print(volatility_rate)
                 maxdd_p,maxdd_t = max_drawdown(df)
-                # print(maxdd)
-                # if(maxDrawdown > maxdd):
-                #     is_risk = False
-                # else:
-                #     is_risk = True
-                # ai_result =  deepseek_generate(date_start,date_end,[currency_1,currency_2],[country_1,country_2],maxdd,maxDrawdown,'个人',std_dev)
+                print('maxdd')
+                # identity_user=request.session.get('user_type')
+                identity_user=global_user_type.get('user_type')
+                print(identity_user)
+                temp = False
+                for value in maxdd_p:
+                    if value >= maxDrawdown:
+                        temp = True
+                        break
+                print(maxDrawdown)
+                temp2 = False
+                for value in maxdd_t:
+                    if value >= maxDrawdown:
+                        temp2 = True
+                        break
+                if temp or temp2:
+                    ai_result =  deepseek_generate(date_start,date_end,[currency_1,currency_2],[country_1,country_2],[maxdd_p,maxdd_t],maxDrawdown,'个人’',std_dev)
+                else:
+                    ai_result = '无风险'
                 return JsonResponse({'message': '获取成功',
                                      'data':{
                                          'date_time':date_time_list,
@@ -361,15 +333,13 @@ def currency_pair(request):
                                          'volatility_rate':volatility_rate,
                                          'maxdd_predict':maxdd_p,
                                          'maxdd_true':maxdd_t,
-                                        #  'is_risk':is_risk,
-                                        #  'ai_result':ai_result
+                                         'ai_result':ai_result
                                          }
                                     },status=201)
-        # except json.JSONDecodeError:
-        #     return JsonResponse({'status': 'error', 'message': '无效的 JSON 数据'}, status=401)
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=501)
-        
+
+
 def multi_currency(request):
      if request.method == 'POST':
         try:
