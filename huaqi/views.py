@@ -24,6 +24,7 @@ def login(request):
 
         access_token=secrets.token_hex(32)
         obj_user=models.userInfo.objects.filter(name=username,password=password).first()
+        # obj_user = ["k"]
         if obj_user is not None :
         #   print(obj_user.account_name)
         #   request.session['user_type'] = obj_user.user_type
@@ -62,7 +63,7 @@ def login(request):
 
 def register(request):
     if request.method == "POST":
-        global global_user_data
+        global global_user_type
         data = json.loads(request.body)
         username = data.get('username')
         password =data.get('password')
@@ -70,7 +71,7 @@ def register(request):
         user_type =data.get('category')
         email =data.get('email')
         print(username,password,confirm_password,email)
-        global_user_data = {
+        global_user_type = {
             'user_type': user_type,
         }
         if password != confirm_password:
@@ -80,13 +81,10 @@ def register(request):
         else:
          models.userInfo.objects.create(name=username,password=password,user_type=user_type,email=email)
          return JsonResponse({'status': 'ok', 'message': '注册成功'})
-<<<<<<< HEAD
-        
 
 
 
-=======
->>>>>>> d4603f52481ff831a4bc9d374bf39bb1e64d29b7
+
 
 def submit_view(request):
     #if request.method == "GET":
@@ -240,10 +238,7 @@ def max_drawdown(df):
     original_list2 = np.array(original_list2)
     res_list2 = list((new_list2-original_list2)/original_list2*100)
     return res_list,res_list2
-<<<<<<< HEAD
 
-=======
->>>>>>> d4603f52481ff831a4bc9d374bf39bb1e64d29b7
 
 def currency_pair(request):
     print(request.body)
@@ -312,12 +307,9 @@ def currency_pair(request):
                 print(volatility_rate)
                 maxdd_p,maxdd_t = max_drawdown(df)
                 print('maxdd')
-<<<<<<< HEAD
                 # identity_user=request.session.get('user_type')
                 identity_user=global_user_type.get('user_type')
                 print(identity_user)
-=======
->>>>>>> d4603f52481ff831a4bc9d374bf39bb1e64d29b7
                 temp = False
                 for value in maxdd_p:
                     if value >= maxDrawdown:
@@ -330,11 +322,7 @@ def currency_pair(request):
                         temp2 = True
                         break
                 if temp or temp2:
-<<<<<<< HEAD
-                    ai_result =  deepseek_generate(date_start,date_end,[currency_1,currency_2],[country_1,country_2],[maxdd_p,maxdd_t],maxDrawdown,'个人’',std_dev)
-=======
-                    ai_result =  deepseek_generate(date_start,date_end,[currency_1,currency_2],[country_1,country_2],[maxdd_p,maxdd_t],maxDrawdown,'个人',std_dev)
->>>>>>> d4603f52481ff831a4bc9d374bf39bb1e64d29b7
+                    ai_result =  deepseek_generate(date_start,date_end,[currency_1,currency_2],[country_1,country_2],[maxdd_p,maxdd_t],maxDrawdown,identity_user,std_dev)
                 else:
                     ai_result = '无风险'
                 return JsonResponse({'message': '获取成功',
